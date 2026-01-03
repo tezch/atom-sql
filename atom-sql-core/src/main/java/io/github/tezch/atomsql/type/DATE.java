@@ -1,0 +1,58 @@
+package io.github.tezch.atomsql.type;
+
+import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Types;
+import java.time.LocalDate;
+
+import io.github.tezch.atomsql.AtomSqlException;
+import io.github.tezch.atomsql.AtomSqlType;
+
+/**
+ * {@link LocalDate}
+ */
+public class DATE implements AtomSqlType {
+
+	/**
+	 * singleton
+	 */
+	public static final AtomSqlType instance = new DATE();
+
+	private DATE() {}
+
+	@Override
+	public Class<?> type() {
+		return LocalDate.class;
+	}
+
+	@Override
+	public int bind(int index, PreparedStatement statement, Object value) {
+		if (value == null) return NullBinder.bind(index, statement, Types.DATE);
+
+		try {
+			statement.setDate(index, Date.valueOf((LocalDate) value));
+			return index + 1;
+		} catch (SQLException e) {
+			throw new AtomSqlException(e);
+		}
+	}
+
+	@Override
+	public LocalDate get(ResultSet rs, String columnLabel) throws SQLException {
+		var value = rs.getDate(columnLabel);
+		return value == null ? null : value.toLocalDate();
+	}
+
+	@Override
+	public LocalDate get(ResultSet rs, int columnIndex) throws SQLException {
+		var value = rs.getDate(columnIndex);
+		return value == null ? null : value.toLocalDate();
+	}
+
+	@Override
+	public AtomSqlType toTypeArgument() {
+		return this;
+	}
+}

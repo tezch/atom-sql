@@ -1,0 +1,56 @@
+package io.github.tezch.atomsql.type;
+
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Types;
+
+import io.github.tezch.atomsql.AtomSqlException;
+import io.github.tezch.atomsql.AtomSqlType;
+
+/**
+ * {@link Float}
+ */
+public class FLOAT implements AtomSqlType {
+
+	/**
+	 * singleton
+	 */
+	public static final AtomSqlType instance = new FLOAT();
+
+	private FLOAT() {}
+
+	@Override
+	public Class<?> type() {
+		return Float.class;
+	}
+
+	@Override
+	public int bind(int index, PreparedStatement statement, Object value) {
+		if (value == null) return NullBinder.bind(index, statement, Types.FLOAT);
+
+		try {
+			statement.setFloat(index, (float) value);
+			return index + 1;
+		} catch (SQLException e) {
+			throw new AtomSqlException(e);
+		}
+	}
+
+	@Override
+	public Object get(ResultSet rs, String columnLabel) throws SQLException {
+		var value = rs.getFloat(columnLabel);
+		return rs.wasNull() ? null : value;
+	}
+
+	@Override
+	public Object get(ResultSet rs, int columnIndex) throws SQLException {
+		var value = rs.getFloat(columnIndex);
+		return rs.wasNull() ? null : value;
+	}
+
+	@Override
+	public AtomSqlType toTypeArgument() {
+		return this;
+	}
+}
