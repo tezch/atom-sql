@@ -132,14 +132,14 @@ class MetadataBuilder {
 			methodContents.add("parameterOptionalColumns = {" + flags + "}");
 		}
 
-		if (info.parametersUnfolder != null)
-			methodContents.add("parametersUnfolder = " + info.parametersUnfolder + ".class");
+		if (info.parameterBinder != null)
+			methodContents.add("parameterBinder = " + info.parameterBinder + ".class");
 
 		if (info.dataType != null)
 			methodContents.add("result = " + info.dataType + ".class");
 
-		if (info.protoatomUnfolder != null)
-			methodContents.add("protoatomUnfolder = " + info.protoatomUnfolder + ".class");
+		if (info.protoatomImplanter != null)
+			methodContents.add("protoatomImplanter = " + info.protoatomImplanter + ".class");
 
 		return "@Method(" + String.join(", ", methodContents) + ")";
 	}
@@ -162,10 +162,10 @@ class MetadataBuilder {
 
 		final List<Boolean> parameterOptionalColumns = new LinkedList<>();
 
-		String parametersUnfolder;
+		String parameterBinder;
 
 		String dataType;
 
-		String protoatomUnfolder;
+		String protoatomImplanter;
 	}
 }

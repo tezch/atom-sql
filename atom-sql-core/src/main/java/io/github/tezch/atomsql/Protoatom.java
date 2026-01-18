@@ -26,11 +26,11 @@ public class Protoatom<T, A> {
 
 	private final Atom<T> atom;
 
-	private final Class<?> atomsUnfolderClass;
+	private final Class<?> implanterClass;
 
-	Protoatom(Atom<T> atom, Class<?> atomsUnfolderClass) {
+	Protoatom(Atom<T> atom, Class<?> implanterClass) {
 		this.atom = atom;
-		this.atomsUnfolderClass = atomsUnfolderClass;
+		this.implanterClass = implanterClass;
 	}
 
 	/**
@@ -42,22 +42,22 @@ public class Protoatom<T, A> {
 	public Atom<T> implant(Consumer<A> consumer) {
 		Object instance;
 		try {
-			instance = atomsUnfolderClass.getConstructor().newInstance();
+			instance = implanterClass.getConstructor().newInstance();
 		} catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException | InstantiationException e) {
 			throw new IllegalStateException(e);
 		}
 
 		@SuppressWarnings("unchecked")
-		A atomsUnfolder = (A) instance;
+		A implanter = (A) instance;
 
-		consumer.accept(atomsUnfolder);
+		consumer.accept(implanter);
 
 		Map<String, Atom<?>> map = new HashMap<>();
-		Arrays.stream(atomsUnfolderClass.getDeclaredFields()).forEach(f -> {
+		Arrays.stream(implanterClass.getDeclaredFields()).forEach(f -> {
 			f.setAccessible(true);
 
 			try {
-				var value = (Atom<?>) f.get(atomsUnfolder);
+				var value = (Atom<?>) f.get(implanter);
 
 				if (value == null) return;
 
@@ -78,6 +78,6 @@ public class Protoatom<T, A> {
 	 * @return 部分的に展開された新しい{@link Protoatom}
 	 */
 	public Protoatom<T, A> renew(Consumer<A> consumer) {
-		return new Protoatom<>(implant(consumer), atomsUnfolderClass);
+		return new Protoatom<>(implant(consumer), implanterClass);
 	}
 }

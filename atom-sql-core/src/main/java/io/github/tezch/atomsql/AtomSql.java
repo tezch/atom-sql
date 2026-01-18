@@ -362,20 +362,20 @@ public class AtomSql {
 		SqlProxyHelper helper;
 		var entry = nameAnnotation.map(a -> endpoints.get(a.value())).orElseGet(() -> endpoints.get());
 		if (parameterTypes.length == 1 && parameterTypes[0].equals(Consumer.class)) {
-			var parametersUnfolderClass = metadata.parametersUnfolder();
-			var parametersUnfolder = parametersUnfolderClass.getConstructor().newInstance();
+			var parameterBinderClass = metadata.parameterBinder();
+			var parameterBinder = parameterBinderClass.getConstructor().newInstance();
 
-			Consumer.class.getMethod("accept", Object.class).invoke(args[0], new Object[] { parametersUnfolder });
+			Consumer.class.getMethod("accept", Object.class).invoke(args[0], new Object[] { parameterBinder });
 
 			var names = new LinkedList<String>();
 			var values = new LinkedList<Object>();
 			var types = new LinkedList<AtomSqlType>();
-			Arrays.stream(parametersUnfolderClass.getFields()).forEach(f -> {
+			Arrays.stream(parameterBinderClass.getFields()).forEach(f -> {
 				names.add(f.getName());
 
 				Object value;
 				try {
-					value = f.get(parametersUnfolder);
+					value = f.get(parameterBinder);
 				} catch (IllegalAccessException e) {
 					throw new IllegalStateException(e);
 				}
@@ -442,7 +442,7 @@ public class AtomSql {
 		} else if (returnType.equals(int.class) || returnType.equals(void.class)) {
 			return atom.execute();
 		} else if (returnType.equals(Protoatom.class)) {
-			return new Protoatom<>(atom, metadata.protoatomUnfolder());
+			return new Protoatom<>(atom, metadata.protoatomImplanter());
 		} else {
 			//不正な戻り値の型
 			throw new IllegalStateException("Incorrect return type: " + returnType);

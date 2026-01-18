@@ -48,11 +48,11 @@ abstract class SourceBuilder {
 		/**
 		 * 生成したクラスの一覧ファイル名
 		 */
-		private static final String fileName = "io.github.tezch.atom-sql.unfolder-list";
+		private static final String fileName = "io.github.tezch.atom-sql.helper-list";
 
 		//生成クラス名, メソッド名
-		//メソッドのパラメータの型はConsumer<Unfolder>固定なので識別にはメソッド名だけでOK
-		private final Map<String, MethodInfo> allUnfolderNames = new HashMap<>();
+		//メソッドのパラメータの型はConsumer<Helper>固定なので識別にはメソッド名だけでOK
+		private final Map<String, MethodInfo> allHelperNames = new HashMap<>();
 
 		void start(ProcessingEnvironment env) {
 			try {
@@ -63,7 +63,7 @@ abstract class SourceBuilder {
 						Arrays.stream(new String(AtomSqlUtils.readBytes(input), Constants.CHARSET).split("\\s+"))
 							.filter(l -> l.length() > 0)//空の場合スキップ
 							.map(l -> new MethodInfo(l))
-							.forEach(i -> allUnfolderNames.put(i.generatedClass, i));
+							.forEach(i -> allHelperNames.put(i.generatedClass, i));
 					}
 				}
 			} catch (IOException e) {
@@ -73,7 +73,7 @@ abstract class SourceBuilder {
 		}
 
 		void finish(ProcessingEnvironment env) {
-			var data = String.join(Constants.NEW_LINE, (allUnfolderNames.values().stream().map(i -> i.pack()).toList()));
+			var data = String.join(Constants.NEW_LINE, (allHelperNames.values().stream().map(i -> i.pack()).toList()));
 
 			try (var output = new BufferedOutputStream(
 				env.getFiler().createResource(StandardLocation.CLASS_OUTPUT, "", fileName).openOutputStream())) {
@@ -84,11 +84,11 @@ abstract class SourceBuilder {
 		}
 
 		private void put(String className, MethodInfo info) {
-			allUnfolderNames.put(className, info);
+			allHelperNames.put(className, info);
 		}
 
 		private MethodInfo get(String className) {
-			return allUnfolderNames.get(className);
+			return allHelperNames.get(className);
 		}
 	}
 

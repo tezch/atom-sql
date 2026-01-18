@@ -39,7 +39,7 @@ public @interface Method {
 	 * メソッドの{@link Consumer}に指定されたクラス
 	 * @return メソッドの{@link Consumer}に指定されたクラス
 	 */
-	Class<?> parametersUnfolder() default Object.class;
+	Class<?> parameterBinder() default Object.class;
 
 	/**
 	 * 戻り値の型パラメータで示されるAtom SQL検索結果で使用可能なクラス化または{@link DataObject}クラス
@@ -51,5 +51,5 @@ public @interface Method {
 	 * {@link Protoatom}に指定されたクラス
 	 * @return {@link Protoatom} に指定されたクラス
 	 */
-	Class<?> protoatomUnfolder() default Object.class;
+	Class<?> protoatomImplanter() default Object.class;
 }

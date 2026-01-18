@@ -70,9 +70,9 @@ class SqlProxyProcessor {
 
 	private final DuplicateClassChecker duplicateClassChecker;
 
-	private final ParameterBinderBuilder parametersUnfolderBuilder;
+	private final ParameterBinderBuilder parameterBinderBuilder;
 
-	private final ProtoatomImplanterBuilder protoatomUnfolderBuilder;
+	private final ProtoatomImplanterBuilder protoatomImplanterBuilder;
 
 	private final DataObjectBuilder dataObjectBuilder;
 
@@ -83,8 +83,8 @@ class SqlProxyProcessor {
 		metadataBuilder = new MetadataBuilder(processingEnv, methodVisitor);
 
 		duplicateClassChecker = new DuplicateClassChecker();
-		parametersUnfolderBuilder = new ParameterBinderBuilder(processingEnv, duplicateClassChecker);
-		protoatomUnfolderBuilder = new ProtoatomImplanterBuilder(processingEnv, duplicateClassChecker);
+		parameterBinderBuilder = new ParameterBinderBuilder(processingEnv, duplicateClassChecker);
+		protoatomImplanterBuilder = new ProtoatomImplanterBuilder(processingEnv, duplicateClassChecker);
 		dataObjectBuilder = new DataObjectBuilder(processingEnv, duplicateClassChecker);
 	}
 
@@ -150,7 +150,7 @@ class SqlProxyProcessor {
 		processingEnv.get().getMessager().printMessage(Kind.ERROR, message, e);
 	}
 
-	private static record ReturnTypeCheckerResult(TypeMirror dataType, TypeMirror protoatomUnfolderType) {
+	private static record ReturnTypeCheckerResult(TypeMirror dataType, TypeMirror protoatomImplanterType) {
 
 		private static final ReturnTypeCheckerResult defaultValue = new ReturnTypeCheckerResult(null, null);
 
@@ -158,8 +158,8 @@ class SqlProxyProcessor {
 			return new ReturnTypeCheckerResult(dataType, null);
 		}
 
-		private static ReturnTypeCheckerResult newInstance(TypeMirror dataType, TypeMirror protoatomUnfolderType) {
-			return new ReturnTypeCheckerResult(dataType, protoatomUnfolderType);
+		private static ReturnTypeCheckerResult newInstance(TypeMirror dataType, TypeMirror protoatomImplanterType) {
+			return new ReturnTypeCheckerResult(dataType, protoatomImplanterType);
 		}
 	}
 
@@ -257,7 +257,7 @@ class SqlProxyProcessor {
 					dataObjectBuilder.execute(p);
 				}
 
-				protoatomUnfolderBuilder.execute(p);
+				protoatomImplanterBuilder.execute(p);
 
 				return processProtoatom(t, p);
 			}
@@ -289,7 +289,7 @@ class SqlProxyProcessor {
 			}
 
 			if (ProcessorUtils.sameClass(type, Protoatom.class)) {
-				protoatomUnfolderBuilder.execute(p);
+				protoatomImplanterBuilder.execute(p);
 
 				if (needsDataObjectBuild) {
 					dataObjectBuilder.execute(p);
@@ -318,12 +318,12 @@ class SqlProxyProcessor {
 				return errorDataType(dataType, p);
 			}
 
-			var protoatomUnfolderType = t.getTypeArguments().get(1);
-			if (ProcessorUtils.toElement(protoatomUnfolderType) == null) {
+			var protoatomImplanterType = t.getTypeArguments().get(1);
+			if (ProcessorUtils.toElement(protoatomImplanterType) == null) {
 				return errorAction(t, p);
 			}
 
-			return ReturnTypeCheckerResult.newInstance(dataType, protoatomUnfolderType);
+			return ReturnTypeCheckerResult.newInstance(dataType, protoatomImplanterType);
 		}
 	}
 
@@ -363,7 +363,7 @@ class SqlProxyProcessor {
 			TypeElement type = ProcessorUtils.toTypeElement(t.asElement());
 
 			if (ProcessorUtils.sameClass(type, Consumer.class)) {
-				parametersUnfolderBuilder.execute(method);
+				parameterBinderBuilder.execute(method);
 				return processConsumerType(p);
 			}
 
@@ -385,7 +385,7 @@ class SqlProxyProcessor {
 			var type = ProcessorUtils.toTypeElement(t.asElement());
 
 			if (ProcessorUtils.sameClass(type, Consumer.class)) {
-				parametersUnfolderBuilder.execute(method);
+				parameterBinderBuilder.execute(method);
 				return processConsumerType(p);
 			}
 
@@ -437,7 +437,7 @@ class SqlProxyProcessor {
 
 				var typeArg = parameter.asType().accept(checker, parameter);
 				if (typeArg != null) {
-					info.parametersUnfolder = typeArg.accept(typeNameExtractor, e);
+					info.parameterBinder = typeArg.accept(typeNameExtractor, e);
 				}
 			});
 
@@ -482,7 +482,7 @@ class SqlProxyProcessor {
 				return DEFAULT_VALUE;
 			}
 
-			if (info.parametersUnfolder == null) {
+			if (info.parameterBinder == null) {
 				//通常のメソッド引数が存在するので検査対象
 				Set<String> placeholders = new TreeSet<>();
 				PlaceholderFinder.execute(result.sql, f -> {
@@ -510,8 +510,8 @@ class SqlProxyProcessor {
 				info.dataType = returnTypeCheckerResult.dataType.accept(typeNameExtractor, e);
 			}
 
-			if (returnTypeCheckerResult.protoatomUnfolderType != null) {
-				info.protoatomUnfolder = returnTypeCheckerResult.protoatomUnfolderType.accept(typeNameExtractor, e);
+			if (returnTypeCheckerResult.protoatomImplanterType != null) {
+				info.protoatomImplanter = returnTypeCheckerResult.protoatomImplanterType.accept(typeNameExtractor, e);
 			}
 
 			p.add(info);

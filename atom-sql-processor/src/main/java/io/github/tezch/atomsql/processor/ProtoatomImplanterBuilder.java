@@ -49,7 +49,7 @@ class ProtoatomImplanterBuilder extends HelperBuilder {
 		var element = ProcessorUtils.toElement(typeArg);
 		if (element == null) {
 			//Protoatom<DataObject, ?>とされた場合
-			error(Protoatom.class.getSimpleName() + " requires unfolder type arguments", method);
+			error(Protoatom.class.getSimpleName() + " requires implanter type arguments", method);
 
 			return ExtractResult.fail;
 		}
