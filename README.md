@@ -498,7 +498,12 @@ public List<SampleInfo> selectSample(Consumer<SampleParameters> consumer);
 ※CSV型を使用する場合は型パラメーターを記述する必要がある  
 型パラメーターに指定可能な型は、スレッドセーフかつプリミティブではない型（前述）  
 
-※enumを使用する場合は、enumのFQCNを直接記述することが可能  
+※型ヒントはあくまでヒントであり、SQL内のプレースホルダ全てに型ヒントが設定されていなくてもコンパイルエラーとはならないので指定漏れには注意が必要  
+
+- __型ヒントでのenum__  
+enumを使用する場合は、enumのFQCNを直接記述することが可能  
+使用するenumの各フィールドに`@EnumValue`を付与し値を記述しておくことで、DBに格納されている実際の値が一致するフィールドに変換される  
+DBに格納されている値が文字列の場合、enumに`@StringEnum`、各フィールドに`@StringEnumValue`を付与することで変換が可能となる  
 
 ```java
 @Sql("UPDATE sample SET name = :name/*STRING*/ WHERE type = :type/*your.Enum*/")
@@ -509,15 +514,15 @@ public int updateSample(Consumer<SampleParameters> consumer);
 public List<SampleInfo> selectSampleWithCsv(Consumer<SampleParameters> consumer);
 ```
 
-※型ヒントはあくまでヒントであり、SQL内のプレースホルダ全てに型ヒントが設定されていなくてもコンパイルエラーとはならないので指定漏れには注意が必要  
-
 - __型ヒントによる@DataObjectの自動生成__  
 SELECT句の検索項目名の直後に型ヒントを記述することで検索結果格納用のクラスが自動生成される
+
 ```java
 @Sql("""
 SELECT
   id/*P_LONG*/,
   name/*STRING*/,
+  address/*OPT<STRING>*/,
   created_at/*DATETIME*/
 FROM
   sample
@@ -528,6 +533,8 @@ public List<SampleInfo> selectSampleWithCsv(Consumer<SampleParameters> consumer)
 ```
 
 上記`SampleInfo`は自動生成されるクラス名として使用されるため、この`@SqlProxy`と同じパッケージに同じ名前のクラスが存在しないようにすること  
+型ヒントに`/*OPT<実際の型ヒント>*/`と記述することで、Optionalなメンバーが作成される  
+
 
 ### SQL文の編集  
 SELECT文のWHERE句が可変であったり、SQL内に同じ箇所が複数出現するため、一度定義したものを展開するようにしたい等SQLを編集したい場合がある  
@@ -543,9 +550,9 @@ public Atom<?> updateSample(String name, long id);
 1. Atom同士の結合  
 `Atom#and(Atom)`  
 `Atom#or(Atom)`  
-`Atom#concat(Atom...)`  
-`Atom#joinAndConcat(Atom, Atom...)`  
-`Atom#join(Atom, List<Atom>)`  
+`Atom#fuse(Atom...)`  
+`Atom#fuseWith(Atom, Atom...)`  
+`Atom#interfuse(Atom, List<Atom>)`  
 
 ※使い方の詳細はそれぞれのjavadocを確認のこと
 
@@ -555,7 +562,7 @@ SQL内の任意の箇所に変数を記述し、そこに他のAtomを挿入す�
 
   - インデックス値を使用した変数展開  
 変数として配列のインデックス値を記述する方式  
-メソッド`Atom#put(Atom...)`を使用して変数展開を行う  
+メソッド`Atom#implant(Atom...)`を使用して変数展開を行う  
 展開場所は、メソッドの引数の配列のインデックスとなる  
 
 定義
@@ -585,14 +592,14 @@ var select = sampleProxy.selectCount();
 var where = optionalValue.map(v -> sampleProxy.where(1)).oeElseGet(() -> sampleProxy.where(2));
 
 // selectは${0}、whereは${1}に展開される
-main.put(select, where).list().forEach(r -> {
+main.implant(select, where).list().forEach(r -> {
     System.out.println(r.id());
 });
 ```
 
   - 任意の文字列を使用した変数展開  
 変数に任意の文字列を記述する方式  
-メソッド`Atom#put(Map<Atom>)`を使用して変数展開を行うことも可能だが、次に紹介する`Protoatom`を使用する方が記述が簡単になるため、メソッド`Atom#put(Map<Atom>)`の使用方法の説明は割愛する  
+メソッド`Atom#implant(Map<Atom>)`を使用して変数展開を行うことも可能だが、次に紹介する`Protoatom`を使用する方が記述が簡単になるため、メソッド`Atom#implant(Map<Atom>)`の使用方法の説明は割愛する  
 
 - __Protoatom__  
 SqlProxyのSQL実施メソッドの戻り値の型に`Protoatom`を使用することで、SQL内に記述した変数をフィールドとして持つクラスをAtom SQLが自動生成する  
@@ -624,7 +631,7 @@ var select = sampleProxy.selectCount();
 
 var where = sampleProxy.where(1);
 
-main.put(f -> {
+main.implant(f -> {
     f.selectClause = select;
     f.whereClause = where;
 }).list().forEach(r -> {
