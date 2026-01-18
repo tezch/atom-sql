@@ -17,7 +17,7 @@ public class ColumnFinder {
 
 	private static final Pattern pattern = Pattern.compile(
 		//:placeholderを排除するため、あえて:を含める
-		"([^\\s[\\p{Punct}&&[^_:]]]+)(/\\*([^\\*]+)\\*/)",
+		"([^\\s[\\p{Punct}&&[^_:]]]+)(/\\*([^\\\\*<]+)(?:<([^\\\\*>]+)>|)\\*/)",
 		Pattern.CASE_INSENSITIVE);
 
 	/**
@@ -72,7 +72,9 @@ public class ColumnFinder {
 
 			found.column = matched;
 
-			found.typeHint = Optional.ofNullable(matcher.group(3));
+			found.typeHint = matcher.group(3);
+
+			found.typeArgumentHint = Optional.ofNullable(matcher.group(4));
 
 			placeholderConsumer.accept(found);
 		}
@@ -92,6 +94,8 @@ public class ColumnFinder {
 
 		public String column;
 
-		public Optional<String> typeHint;
+		public String typeHint;
+
+		public Optional<String> typeArgumentHint;
 	}
 }

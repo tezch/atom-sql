@@ -70,7 +70,7 @@ class DataObjectBuilder extends SourceBuilder {
 		return new ExtractResult(true, element);
 	}
 
-	private void columns(String sql, List<String> columns, List<String> enumValidators) {
+	private void columns(String sql, List<String> columns, List<String> enumValidators, ExecutableElement method) {
 		var dubplicateChecker = new HashSet<String>();
 
 		ColumnFinder.execute(sql, f -> {
@@ -80,11 +80,38 @@ class DataObjectBuilder extends SourceBuilder {
 
 			dubplicateChecker.add(column);
 
-			var type = f.typeHint.map(ProcessorTypeFactory.instance::typeOf).orElse(OBJECT.instance);
+			var typeFactory = ProcessorTypeFactory.instance;
 
-			columns.add(type.typeExpression() + " " + column);
+			String typeExpression;
 
-			ProcessorUtils.enumValidator(type, column).ifPresent(enumValidators::add);
+			if (!"OPT".equals(f.typeHint)) {
+				if (f.typeArgumentHint.isPresent()) {
+					//DataObjectの型ヒントにf.typeHintは使用できません
+					error(f.typeHint + " is not allowed as a type hint for " + DataObject.class.getSimpleName(), method);
+
+					return;
+				}
+
+				var type = typeFactory.typeOf(f.typeHint);
+
+				typeExpression = type.typeExpression();
+
+				ProcessorUtils.enumValidator(type, column).ifPresent(enumValidators::add);
+			} else {
+				typeExpression = Optional.class.getName()
+					+ f.typeArgumentHint
+						.map(typeFactory::typeArgumentOf)
+						.map(t -> "<" + t.typeArgumentExpression() + ">")
+						.get();
+
+				ProcessorUtils.enumValidator(
+					f.typeArgumentHint
+						.map(typeFactory::typeOf)
+						.orElse(OBJECT.instance),
+					column).ifPresent(enumValidators::add);
+			}
+
+			columns.add(typeExpression + " " + column);
 		});
 	}
 
@@ -104,7 +131,7 @@ class DataObjectBuilder extends SourceBuilder {
 
 		var enumValidators = new LinkedList<String>();
 
-		columns(result.sql, columns, enumValidators);
+		columns(result.sql, columns, enumValidators, method);
 
 		param.put("COLUMNS", String.join("," + Constants.NEW_LINE, columns));
 
