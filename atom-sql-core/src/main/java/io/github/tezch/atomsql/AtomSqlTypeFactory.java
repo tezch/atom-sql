@@ -1,5 +1,7 @@
 package io.github.tezch.atomsql;
 
+import java.util.Optional;
+
 /**
  * @author tezch
  */
@@ -17,17 +19,8 @@ public interface AtomSqlTypeFactory {
 	 * タイプ名をもとに{@link AtomSqlType}のインスタンスを返します。
 	 * @param name {@link AtomSqlType}タイプ名
 	 * @return {@link AtomSqlType}
-	 * @throws UnknownSqlTypeNameException 対応する型が存在しない場合
 	 */
-	AtomSqlType typeOf(String name);
-
-	/**
-	 * 型パラメータとしてこのタイプ名が使用される場合のインスタンスを返します。
-	 * @param name {@link AtomSqlType}タイプ名
-	 * @return {@link AtomSqlType}
-	 * @throws UnknownSqlTypeNameException 対応する型が存在しない場合
-	 */
-	AtomSqlType typeArgumentOf(String name);
+	Optional<AtomSqlType> typeOf(String name);
 
 	/**
 	 * プリミティブ型ではない型のうち、使用可能な型かどうかを返します。<br>
@@ -46,35 +39,15 @@ public interface AtomSqlTypeFactory {
 	/**
 	 * クラス名からインスタンスを生成します。
 	 * @param className {@link AtomSqlTypeFactory}を実装したクラス名
+	 * @param loader {@link ClassLoader}
 	 * @return {@link AtomSqlTypeFactory}
 	 */
-	public static AtomSqlTypeFactory newInstance(String className) {
+	public static AtomSqlTypeFactory newInstance(String className, ClassLoader loader) {
 		if (className == null || className.isBlank() || className.equals(DefaultAtomSqlTypeFactory.class.getName()))
 			return DefaultAtomSqlTypeFactory.instance;
 
 		try {
-			return (AtomSqlTypeFactory) Class.forName(
-				className,
-				true,
-				Thread.currentThread().getContextClassLoader()).getConstructor().newInstance();
-		} catch (Exception e) {
-			throw new IllegalStateException(e);
-		}
-	}
-
-	/**
-	 * クラス名からインスタンスを生成します。<br>
-	 * Annotation Processor用
-	 * @param className {@link AtomSqlTypeFactory}を実装したクラス名
-	 * @return {@link AtomSqlTypeFactory}
-	 */
-	public static AtomSqlTypeFactory newInstanceForProcessor(String className) {
-		if (className == null || className.isBlank()) return DefaultAtomSqlTypeFactory.instance;
-		try {
-			return (AtomSqlTypeFactory) Class.forName(
-				className,
-				true,
-				AtomSqlTypeFactory.class.getClassLoader()).getConstructor().newInstance();
+			return (AtomSqlTypeFactory) Class.forName(className, true, loader).getConstructor().newInstance();
 		} catch (Exception e) {
 			throw new IllegalStateException(e);
 		}

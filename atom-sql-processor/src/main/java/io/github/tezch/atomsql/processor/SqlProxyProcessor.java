@@ -15,7 +15,6 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-import javax.annotation.processing.Generated;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.element.Element;
@@ -36,7 +35,6 @@ import javax.tools.StandardLocation;
 
 import io.github.tezch.atomsql.Atom;
 import io.github.tezch.atomsql.AtomSql;
-import io.github.tezch.atomsql.AtomSqlTypeFactory;
 import io.github.tezch.atomsql.AtomSqlUtils;
 import io.github.tezch.atomsql.ColumnFinder;
 import io.github.tezch.atomsql.ColumnFinder.Found;
@@ -60,8 +58,6 @@ class SqlProxyProcessor {
 
 	private final Supplier<ProcessingEnvironment> processingEnv;
 
-	private final AtomSqlTypeFactory typeFactory;
-
 	private final TypeNameExtractor typeNameExtractor;
 
 	private final SqlProxyAnnotationProcessorMethodVisitor methodVisitor = new SqlProxyAnnotationProcessorMethodVisitor();
@@ -74,22 +70,21 @@ class SqlProxyProcessor {
 
 	private final DuplicateClassChecker duplicateClassChecker;
 
-	private final ParametersUnfolderBuilder parametersUnfolderBuilder;
+	private final ParameterBinderBuilder parametersUnfolderBuilder;
 
-	private final ProtoatomUnfolderBuilder protoatomUnfolderBuilder;
+	private final ProtoatomImplanterBuilder protoatomUnfolderBuilder;
 
 	private final DataObjectBuilder dataObjectBuilder;
 
 	public SqlProxyProcessor(Supplier<ProcessingEnvironment> processingEnv) {
 		this.processingEnv = processingEnv;
-		typeFactory = AtomSqlTypeFactory.newInstanceForProcessor(AtomSql.configure().typeFactoryClass());
 		typeNameExtractor = new TypeNameExtractor(processingEnv);
 		methodExtractor = new MethodExtractor(processingEnv);
 		metadataBuilder = new MetadataBuilder(processingEnv, methodVisitor);
 
 		duplicateClassChecker = new DuplicateClassChecker();
-		parametersUnfolderBuilder = new ParametersUnfolderBuilder(processingEnv, duplicateClassChecker);
-		protoatomUnfolderBuilder = new ProtoatomUnfolderBuilder(processingEnv, duplicateClassChecker);
+		parametersUnfolderBuilder = new ParameterBinderBuilder(processingEnv, duplicateClassChecker);
+		protoatomUnfolderBuilder = new ProtoatomImplanterBuilder(processingEnv, duplicateClassChecker);
 		dataObjectBuilder = new DataObjectBuilder(processingEnv, duplicateClassChecker);
 	}
 
@@ -155,14 +150,16 @@ class SqlProxyProcessor {
 		processingEnv.get().getMessager().printMessage(Kind.ERROR, message, e);
 	}
 
-	private static record ReturnTypeCheckerResult(boolean retry, TypeMirror dataType, TypeMirror protoatomUnfolderType) {
+	private static record ReturnTypeCheckerResult(TypeMirror dataType, TypeMirror protoatomUnfolderType) {
 
-		private static final ReturnTypeCheckerResult defaultValue = new ReturnTypeCheckerResult(false, null, null);
+		private static final ReturnTypeCheckerResult defaultValue = new ReturnTypeCheckerResult(null, null);
 
-		private static final ReturnTypeCheckerResult retryNotice = new ReturnTypeCheckerResult(true, null, null);
+		private static ReturnTypeCheckerResult newInstance(TypeMirror dataType) {
+			return new ReturnTypeCheckerResult(dataType, null);
+		}
 
 		private static ReturnTypeCheckerResult newInstance(TypeMirror dataType, TypeMirror protoatomUnfolderType) {
-			return new ReturnTypeCheckerResult(false, dataType, protoatomUnfolderType);
+			return new ReturnTypeCheckerResult(dataType, protoatomUnfolderType);
 		}
 	}
 
@@ -196,20 +193,6 @@ class SqlProxyProcessor {
 			};
 		}
 
-		private boolean isGeneratedDataObject(TypeMirror t) {
-			return typeElement(t).map(e -> {
-				var annotation = e.getAnnotation(Generated.class);
-
-				if (annotation == null) return false;
-
-				var value = annotation.value();
-
-				if (value == null || value.length != 1) return false;
-
-				return DataObjectBuilder.class.getName().equals(value[0]);
-			}).orElse(false);
-		}
-
 		@Override
 		public ReturnTypeCheckerResult visitDeclared(DeclaredType t, ExecutableElement p) {
 			var type = ProcessorUtils.toTypeElement(t.asElement());
@@ -219,7 +202,7 @@ class SqlProxyProcessor {
 				|| ProcessorUtils.sameClass(type, Stream.class)) {
 				var dataType = t.getTypeArguments().get(0);
 
-				if (needsDataObjectBuild && isGeneratedDataObject(dataType)) {
+				if (needsDataObjectBuild) {
 					dataObjectBuilder.execute(p);
 				}
 
@@ -233,7 +216,7 @@ class SqlProxyProcessor {
 					return errorAction(t, p);
 				}
 
-				if (ProcessorUtils.canUse(ProcessorUtils.toTypeElement(dataType), typeFactory)) {
+				if (ProcessorUtils.canUse(ProcessorUtils.toTypeElement(dataType))) {
 					return ReturnTypeCheckerResult.newInstance(dataType, null);
 				}
 
@@ -243,7 +226,7 @@ class SqlProxyProcessor {
 			if (ProcessorUtils.sameClass(type, Atom.class)) {
 				var dataType = t.getTypeArguments().get(0);
 
-				if (needsDataObjectBuild && isGeneratedDataObject(dataType)) {
+				if (needsDataObjectBuild) {
 					dataObjectBuilder.execute(p);
 				}
 
@@ -262,7 +245,7 @@ class SqlProxyProcessor {
 				//<?>が使用できないケースでの使用を想定
 				//Atom<?>だと、Optional等で扱えないケースがあるため
 				if (ProcessorUtils.sameClass(typeElement, Void.class)
-					|| ProcessorUtils.canUse(typeElement, typeFactory)) {
+					|| ProcessorUtils.canUse(typeElement)) {
 					return ReturnTypeCheckerResult.newInstance(dataType, null);
 				}
 
@@ -270,7 +253,7 @@ class SqlProxyProcessor {
 			}
 
 			if (ProcessorUtils.sameClass(type, Protoatom.class)) {
-				if (needsDataObjectBuild && isGeneratedDataObject(t.getTypeArguments().get(0))) {
+				if (needsDataObjectBuild) {
 					dataObjectBuilder.execute(p);
 				}
 
@@ -301,7 +284,7 @@ class SqlProxyProcessor {
 					|| ProcessorUtils.sameClass(type, Atom.class)) {
 					dataObjectBuilder.execute(p);
 
-					return ReturnTypeCheckerResult.retryNotice;
+					return processDataObject(t);
 				}
 			}
 
@@ -311,13 +294,17 @@ class SqlProxyProcessor {
 				if (needsDataObjectBuild) {
 					dataObjectBuilder.execute(p);
 
-					return ReturnTypeCheckerResult.retryNotice;
+					return processDataObject(t);
 				}
 
 				return processProtoatom(t, p);
 			}
 
 			return errorAction(t, p);
+		}
+
+		private ReturnTypeCheckerResult processDataObject(DeclaredType t) {
+			return ReturnTypeCheckerResult.newInstance(t.getTypeArguments().get(0));
 		}
 
 		private ReturnTypeCheckerResult processProtoatom(DeclaredType t, ExecutableElement p) {
@@ -327,7 +314,7 @@ class SqlProxyProcessor {
 				// <?>
 				// Protoatomの場合は、結果型パラメータを指定しなくてOK
 				dataType = null;
-			} else if (!isAnnotated(dataType, DataObject.class) && !ProcessorUtils.canUse(ProcessorUtils.toTypeElement(dataType), typeFactory)) {
+			} else if (!isAnnotated(dataType, DataObject.class) && !ProcessorUtils.canUse(ProcessorUtils.toTypeElement(dataType))) {
 				return errorDataType(dataType, p);
 			}
 
@@ -380,13 +367,13 @@ class SqlProxyProcessor {
 				return processConsumerType(p);
 			}
 
-			if (ProcessorUtils.canUse(type, typeFactory)) return DEFAULT_VALUE;
+			if (ProcessorUtils.canUse(type)) return DEFAULT_VALUE;
 
-			var csvType = new CSV(typeFactory).type();
+			var csvType = new CSV(ProcessorTypeFactory.instance.atomSqlTypeFactory).type();
 			if (ProcessorUtils.sameClass(type, csvType)) {
 				var argumentType = ProcessorUtils.toTypeElement(ProcessorUtils.toElement(t.getTypeArguments().get(0)));
 
-				if (ProcessorUtils.canUse(argumentType, typeFactory)) return DEFAULT_VALUE;
+				if (ProcessorUtils.canUse(argumentType)) return DEFAULT_VALUE;
 			}
 
 			return defaultAction(t, p);
@@ -518,9 +505,6 @@ class SqlProxyProcessor {
 			var returnTypeChecker = new ReturnTypeChecker(!columns.isEmpty());
 
 			var returnTypeCheckerResult = returnType.accept(returnTypeChecker, e);
-			if (returnTypeCheckerResult.retry) {
-				returnTypeCheckerResult = e.getReturnType().accept(returnTypeChecker, e);
-			}
 
 			if (returnTypeCheckerResult.dataType != null) {
 				info.dataType = returnTypeCheckerResult.dataType.accept(typeNameExtractor, e);

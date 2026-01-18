@@ -1,12 +1,10 @@
 package io.github.tezch.atomsql;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import io.github.tezch.atomsql.annotation.StringEnum;
 import io.github.tezch.atomsql.type.BIG_DECIMAL;
@@ -92,7 +90,10 @@ public class DefaultAtomSqlTypeFactory implements AtomSqlTypeFactory {
 	 */
 	public static AtomSqlTypeFactory instance = new DefaultAtomSqlTypeFactory();
 
-	private DefaultAtomSqlTypeFactory() {
+	/**
+	 * constructor
+	 */
+	protected DefaultAtomSqlTypeFactory() {
 		Arrays.stream(singletonTypes).forEach(b -> {
 			typeMap.put(b.type(), b);
 			nameMap.put(b.getClass().getSimpleName(), b);
@@ -122,23 +123,8 @@ public class DefaultAtomSqlTypeFactory implements AtomSqlTypeFactory {
 	}
 
 	@Override
-	public AtomSqlType typeOf(String name) {
-		var type = nameMap.get(Objects.requireNonNull(name));
-
-		if (type != null) return type;
-
-		if (Arrays.stream(name.split("\\.")).filter(w -> !AtomSqlUtils.isSafeJavaIdentifier(w)).findFirst().isPresent()) {
-			//Javaシンボルに使用できない文字が含まれていた場合
-			throw new UnknownSqlTypeNameException(name);
-		}
-
-		//processor内で、参照できないクラスの名称から自動生成クラスのフィールドを生成するためのタイプ
-		return new ENUM_EXPRESSION_TYPE(name);
-	}
-
-	@Override
-	public AtomSqlType typeArgumentOf(String name) {
-		return typeOf(name).toTypeArgument();
+	public Optional<AtomSqlType> typeOf(String name) {
+		return Optional.ofNullable(nameMap.get(Objects.requireNonNull(name)));
 	}
 
 	@Override
@@ -151,51 +137,5 @@ public class DefaultAtomSqlTypeFactory implements AtomSqlTypeFactory {
 	@Override
 	public AtomSqlType[] nonPrimitiveTypes() {
 		return nonPrimitiveTypes.clone();
-	}
-
-	private static class ENUM_EXPRESSION_TYPE implements AtomSqlType {
-
-		private final String enumClass;
-
-		private ENUM_EXPRESSION_TYPE(String enumClass) {
-			this.enumClass = enumClass;
-		}
-
-		@Override
-		public Class<?> type() {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public int bind(int index, PreparedStatement statement, Object value) {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public Object get(ResultSet rs, String columnLabel) throws SQLException {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public Object get(ResultSet rs, int columnIndex) throws SQLException {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public AtomSqlType toTypeArgument() {
-			return this;
-		}
-
-		@Override
-		public String typeExpression() {
-			//enumClassとしてなんでも記述できないように、Enumの型パラメータとして表現することで
-			//Enumではないクラスを指定された場合コンパイルエラーを発生させる
-			return Enum.class.getName() + "<" + enumClass + ">";
-		}
-
-		@Override
-		public String typeArgumentExpression() {
-			return typeExpression();
-		}
 	}
 }

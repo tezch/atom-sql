@@ -30,8 +30,6 @@ import javax.lang.model.util.SimpleElementVisitor14;
 import javax.lang.model.util.SimpleTypeVisitor14;
 import javax.tools.Diagnostic.Kind;
 
-import io.github.tezch.atomsql.AtomSql;
-import io.github.tezch.atomsql.AtomSqlTypeFactory;
 import io.github.tezch.atomsql.Constants;
 import io.github.tezch.atomsql.annotation.DataObject;
 import io.github.tezch.atomsql.annotation.OptionalColumn;
@@ -45,8 +43,6 @@ class DataObjectProcessor {
 
 	private final Supplier<ProcessingEnvironment> processingEnv;
 
-	private final AtomSqlTypeFactory typeFactory;
-
 	private final TypeNameExtractor typeNameExtractor;
 
 	private final DataObjectAnnotationProcessorMethodVisitor methodVisitor = new DataObjectAnnotationProcessorMethodVisitor();
@@ -55,7 +51,6 @@ class DataObjectProcessor {
 
 	DataObjectProcessor(Supplier<ProcessingEnvironment> processingEnv) {
 		this.processingEnv = processingEnv;
-		typeFactory = AtomSqlTypeFactory.newInstanceForProcessor(AtomSql.configure().typeFactoryClass());
 		typeNameExtractor = new TypeNameExtractor(processingEnv);
 		builder = new MetadataBuilder(processingEnv, methodVisitor);
 	}
@@ -282,7 +277,7 @@ class DataObjectProcessor {
 				}
 
 				var argType = ProcessorUtils.toTypeElement(ProcessorUtils.toElement(arg));
-				if (!ProcessorUtils.canUse(argType, typeFactory))
+				if (!ProcessorUtils.canUse(argType))
 					return defaultAction(t, p);
 
 				optionals.put(p.getSimpleName(), argType);
@@ -290,7 +285,7 @@ class DataObjectProcessor {
 				return true;
 			}
 
-			if (ProcessorUtils.canUse(type, typeFactory))
+			if (ProcessorUtils.canUse(type))
 				return true;
 
 			return defaultAction(t, p);

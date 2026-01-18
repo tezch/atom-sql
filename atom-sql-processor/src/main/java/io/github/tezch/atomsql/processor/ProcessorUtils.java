@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
@@ -21,7 +22,9 @@ import javax.lang.model.util.SimpleTypeVisitor14;
 import javax.tools.StandardLocation;
 
 import io.github.tezch.atomsql.AtomSql;
+import io.github.tezch.atomsql.AtomSqlType;
 import io.github.tezch.atomsql.AtomSqlTypeFactory;
+import io.github.tezch.atomsql.processor.ProcessorTypeFactory.ENUM_EXPRESSION_TYPE;
 
 /**
  * @author tezch
@@ -159,18 +162,34 @@ class ProcessorUtils {
 	 * @param type
 	 * @return boolean
 	 */
-	static boolean canUse(TypeElement type, AtomSqlTypeFactory factory) {
+	static boolean canUse(TypeElement type) {
 		if (type.getKind() == ElementKind.ENUM) return true;
 
 		var typeName = type.getQualifiedName().toString();
 
 		if (typeName.equals(Enum.class.getCanonicalName())) return true;
 
-		return Arrays.stream(factory.nonPrimitiveTypes())
+		return Arrays.stream(ProcessorTypeFactory.instance.atomSqlTypeFactory.nonPrimitiveTypes())
 			.map(t -> t.type())
 			.filter(c -> typeName.equals(c.getCanonicalName()))
 			.findFirst()
 			.isPresent();
+	}
+
+	static Optional<String> enumValidator(AtomSqlType type, String symbol) {
+		if (type instanceof ENUM_EXPRESSION_TYPE) {
+			//enumClassとしてなんでも記述できないように、Enumの型パラメータとして表現することで
+			//Enumではないクラスを指定された場合コンパイルエラーを発生させる
+			return Optional.of(
+				String.format(
+					"%s<%s> %s = null; assert(%s == null);",
+					Enum.class.getName(),
+					type.typeExpression(),
+					symbol,
+					symbol));
+		}
+
+		return Optional.empty();
 	}
 
 	private static class TypeConverter extends SimpleElementVisitor14<TypeElement, Void> {

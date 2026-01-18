@@ -2,7 +2,7 @@ package io.github.tezch.atomsql.processor;
 
 import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -11,18 +11,14 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 
-import io.github.tezch.atomsql.AtomSql;
-import io.github.tezch.atomsql.AtomSqlTypeFactory;
+import io.github.tezch.atomsql.Constants;
 import io.github.tezch.atomsql.PlaceholderFinder;
 import io.github.tezch.atomsql.type.OBJECT;
 
-class ParametersUnfolderBuilder extends UnfolderBuilder {
+class ParameterBinderBuilder extends HelperBuilder {
 
-	private final AtomSqlTypeFactory typeFactory;
-
-	ParametersUnfolderBuilder(Supplier<ProcessingEnvironment> processingEnv, DuplicateClassChecker checker) {
+	ParameterBinderBuilder(Supplier<ProcessingEnvironment> processingEnv, DuplicateClassChecker checker) {
 		super(processingEnv, checker);
-		typeFactory = AtomSqlTypeFactory.newInstanceForProcessor(AtomSql.configure().typeFactoryClass());
 	}
 
 	@Override
@@ -66,22 +62,40 @@ class ParametersUnfolderBuilder extends UnfolderBuilder {
 	}
 
 	@Override
-	List<String> fields(ExecutableElement method, String sql) {
+	Class<?> template() {
+		return ParameterBinder_Template.class;
+	}
+
+	@Override
+	void processFields(ExecutableElement method, String sql, Map<String, String> param) {
 		var dubplicateChecker = new HashSet<String>();
 		var fields = new LinkedList<String>();
+		var enumValidators = new LinkedList<String>();
 		PlaceholderFinder.execute(sql, f -> {
 			//重複は除外
 			if (dubplicateChecker.contains(f.placeholder)) return;
 
 			dubplicateChecker.add(f.placeholder);
 
+			var typeFactory = ProcessorTypeFactory.instance;
+
 			var typeArgument = f.typeArgumentHint
 				.map(typeFactory::typeArgumentOf)
 				.map(t -> "<" + t.typeArgumentExpression() + ">")
 				.orElse("");
 
+			var type = f.typeHint.map(typeFactory::typeOf).orElse(OBJECT.instance);
+
+			ProcessorUtils.enumValidator(type, f.placeholder).ifPresent(enumValidators::add);
+
+			ProcessorUtils.enumValidator(
+				f.typeArgumentHint
+					.map(typeFactory::typeOf)
+					.orElse(OBJECT.instance),
+				f.placeholder).ifPresent(enumValidators::add);
+
 			var field = "public "
-				+ f.typeHint.map(typeFactory::typeOf).orElse(OBJECT.instance).typeExpression()
+				+ type.typeExpression()
 				+ typeArgument
 				+ " "
 				+ f.placeholder
@@ -89,7 +103,9 @@ class ParametersUnfolderBuilder extends UnfolderBuilder {
 			fields.add(field);
 		});
 
-		return fields;
+		param.put("FIELDS", String.join(Constants.NEW_LINE, fields));
+
+		param.put("ENUM_VALIDATORS", String.join(Constants.NEW_LINE, enumValidators));
 	}
 
 	private static TypeElement toTypeElement(VariableElement e) {

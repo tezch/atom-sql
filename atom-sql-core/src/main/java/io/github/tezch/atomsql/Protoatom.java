@@ -35,11 +35,11 @@ public class Protoatom<T, A> {
 
 	/**
 	 * 自動生成された変数展開用クラス I をもとにSQL文の変数展開を行います。
-	 * @see Atom#put(Map)
+	 * @see Atom#implant(Map)
 	 * @param consumer 変数展開用クラスのインスタンスを受け取る{@link Consumer}
 	 * @return 展開された新しい{@link Atom}
 	 */
-	public Atom<T> put(Consumer<A> consumer) {
+	public Atom<T> implant(Consumer<A> consumer) {
 		Object instance;
 		try {
 			instance = atomsUnfolderClass.getConstructor().newInstance();
@@ -67,17 +67,17 @@ public class Protoatom<T, A> {
 			}
 		});
 
-		return atom.put(map);
+		return atom.implant(map);
 	}
 
 	/**
 	 * 自動生成された変数展開用クラス I をもとにSQL文の変数展開を部分的に行います。<br>
-	 * 展開された新しいインスタンスにさらに{@link #put(Consumer)}を行い完全に展開する必要があります。
-	 * @see Protoatom#put(Consumer)
+	 * 展開された新しいインスタンスにさらに{@link #implant(Consumer)}を行い完全に展開する必要があります。
+	 * @see Protoatom#implant(Consumer)
 	 * @param consumer 変数展開用クラスのインスタンスを受け取る{@link Consumer}
 	 * @return 部分的に展開された新しい{@link Protoatom}
 	 */
 	public Protoatom<T, A> renew(Consumer<A> consumer) {
-		return new Protoatom<>(put(consumer), atomsUnfolderClass);
+		return new Protoatom<>(implant(consumer), atomsUnfolderClass);
 	}
 }

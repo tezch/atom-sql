@@ -8,7 +8,6 @@ import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinitionCustomizer;
-import org.springframework.boot.SpringApplication;
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -24,7 +23,6 @@ import io.github.tezch.atomsql.annotation.SqlProxy;
  * Atom SQLをSpringで使用できるように初期化するクラスです。<br>
  * {@link SqlProxy}が付与されたクラスを{@link Autowired}可能にします。<br>
  * application.propertiesにプレフィックスatomsqlを付加することで各設定を記述することが可能です<br>
- * @see SpringApplication#addInitializers(ApplicationContextInitializer...)
  * @author tezch
  */
 public class AtomSqlContextInitializer implements ApplicationContextInitializer<GenericApplicationContext> {

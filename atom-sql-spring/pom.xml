@@ -6,7 +6,7 @@
 	<parent>
 		<groupId>io.github.tezch</groupId>
 		<artifactId>atom-sql-parent</artifactId>
-		<version>0.1.0</version>
+		<version>0.2.0-SNAPSHOT</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
@@ -30,11 +30,6 @@
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-context</artifactId>
 			<version>5.3.18</version>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot</artifactId>
-			<version>2.6.6</version>
 		</dependency>
 	</dependencies>
 </project>

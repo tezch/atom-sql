@@ -193,7 +193,9 @@ public class AtomSql {
 	 * @param endpoints {@link Endpoints}
 	 */
 	public AtomSql(Endpoints endpoints) {
-		typeFactory = AtomSqlTypeFactory.newInstance(configure().typeFactoryClass());
+		typeFactory = AtomSqlTypeFactory.newInstance(
+			configure().typeFactoryClass(),
+			Thread.currentThread().getContextClassLoader());
 		sqlLogger = SqlLogger.instance();
 		this.endpoints = Objects.requireNonNull(endpoints);
 	}
@@ -211,7 +213,9 @@ public class AtomSql {
 	}
 
 	AtomSql() {
-		typeFactory = AtomSqlTypeFactory.newInstance(configure().typeFactoryClass());
+		typeFactory = AtomSqlTypeFactory.newInstance(
+			configure().typeFactoryClass(),
+			Thread.currentThread().getContextClassLoader());
 		sqlLogger = SqlLogger.instance();
 
 		endpoints = new Endpoints(new Endpoint() {

@@ -13,8 +13,6 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ExecutableElement;
 
 import io.github.tezch.atomsql.Atom;
-import io.github.tezch.atomsql.AtomSql;
-import io.github.tezch.atomsql.AtomSqlTypeFactory;
 import io.github.tezch.atomsql.ColumnFinder;
 import io.github.tezch.atomsql.Constants;
 import io.github.tezch.atomsql.Protoatom;
@@ -27,11 +25,8 @@ import io.github.tezch.atomsql.type.OBJECT;
  */
 class DataObjectBuilder extends SourceBuilder {
 
-	private final AtomSqlTypeFactory typeFactory;
-
 	DataObjectBuilder(Supplier<ProcessingEnvironment> processingEnv, DuplicateClassChecker checker) {
 		super(processingEnv, checker);
-		typeFactory = AtomSqlTypeFactory.newInstanceForProcessor(AtomSql.configure().typeFactoryClass());
 	}
 
 	@Override
@@ -75,9 +70,8 @@ class DataObjectBuilder extends SourceBuilder {
 		return new ExtractResult(true, element);
 	}
 
-	private List<String> columns(ExecutableElement method, String sql) {
+	private void columns(String sql, List<String> columns, List<String> enumValidators) {
 		var dubplicateChecker = new HashSet<String>();
-		var columns = new LinkedList<String>();
 
 		ColumnFinder.execute(sql, f -> {
 			var column = f.column;
@@ -86,12 +80,12 @@ class DataObjectBuilder extends SourceBuilder {
 
 			dubplicateChecker.add(column);
 
-			var type = f.typeHint.map(typeFactory::typeOf).orElse(OBJECT.instance).typeExpression();
+			var type = f.typeHint.map(ProcessorTypeFactory.instance::typeOf).orElse(OBJECT.instance);
 
-			columns.add(type + " " + column);
+			columns.add(type.typeExpression() + " " + column);
+
+			ProcessorUtils.enumValidator(type, column).ifPresent(enumValidators::add);
 		});
-
-		return columns;
 	}
 
 	@Override
@@ -106,7 +100,15 @@ class DataObjectBuilder extends SourceBuilder {
 		param.put("PACKAGE", result.packageName.isEmpty() ? "" : ("package " + result.packageName + ";"));
 		param.put("CLASS", generateClassName);
 
-		param.put("COLUMNS", String.join("," + Constants.NEW_LINE, columns(method, result.sql)));
+		var columns = new LinkedList<String>();
+
+		var enumValidators = new LinkedList<String>();
+
+		columns(result.sql, columns, enumValidators);
+
+		param.put("COLUMNS", String.join("," + Constants.NEW_LINE, columns));
+
+		param.put("ENUM_VALIDATORS", String.join(Constants.NEW_LINE, enumValidators));
 
 		return Formatter.format(template, param);
 	}

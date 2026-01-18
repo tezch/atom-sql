@@ -1,30 +1,30 @@
 package io.github.tezch.atomsql.processor;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ExecutableElement;
 
-import io.github.tezch.atomsql.Constants;
 import io.github.tezch.atomsql.processor.MethodExtractor.Result;
 
 /**
  * @author tezch
  */
-abstract class UnfolderBuilder extends SourceBuilder {
+abstract class HelperBuilder extends SourceBuilder {
 
-	UnfolderBuilder(Supplier<ProcessingEnvironment> processingEnv, DuplicateClassChecker checker) {
+	HelperBuilder(Supplier<ProcessingEnvironment> processingEnv, DuplicateClassChecker checker) {
 		super(processingEnv, checker);
 	}
 
-	abstract List<String> fields(ExecutableElement method, String sql);
+	abstract void processFields(ExecutableElement method, String sql, Map<String, String> param);
+
+	abstract Class<?> template();
 
 	@Override
 	String source(String generateClassName, ExecutableElement method, Result result) {
-		var template = Formatter.readTemplate(Unfolder_Template.class, "UTF-8");
+		var template = Formatter.readTemplate(template(), "UTF-8");
 		template = Formatter.convertToTemplate(template);
 
 		Map<String, String> param = new HashMap<>();
@@ -34,7 +34,7 @@ abstract class UnfolderBuilder extends SourceBuilder {
 		param.put("PACKAGE", result.packageName.isEmpty() ? "" : ("package " + result.packageName + ";"));
 		param.put("CLASS", generateClassName);
 
-		param.put("FIELDS", String.join(Constants.NEW_LINE, fields(method, result.sql)));
+		processFields(method, result.sql, param);
 
 		return Formatter.format(template, param);
 	}

@@ -2,18 +2,19 @@ package io.github.tezch.atomsql.processor;
 
 import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ExecutableElement;
 
 import io.github.tezch.atomsql.Atom;
+import io.github.tezch.atomsql.Constants;
 import io.github.tezch.atomsql.Protoatom;
 
-class ProtoatomUnfolderBuilder extends UnfolderBuilder {
+class ProtoatomImplanterBuilder extends HelperBuilder {
 
-	ProtoatomUnfolderBuilder(Supplier<ProcessingEnvironment> processingEnv, DuplicateClassChecker checker) {
+	ProtoatomImplanterBuilder(Supplier<ProcessingEnvironment> processingEnv, DuplicateClassChecker checker) {
 		super(processingEnv, checker);
 	}
 
@@ -57,7 +58,12 @@ class ProtoatomUnfolderBuilder extends UnfolderBuilder {
 	}
 
 	@Override
-	List<String> fields(ExecutableElement method, String sql) {
+	Class<?> template() {
+		return ProtoatomImplanter_Template.class;
+	}
+
+	@Override
+	void processFields(ExecutableElement method, String sql, Map<String, String> param) {
 		var dubplicateChecker = new HashSet<String>();
 		var fields = new LinkedList<String>();
 		AtomVariableFinder.execute(sql, variable -> {
@@ -74,6 +80,6 @@ class ProtoatomUnfolderBuilder extends UnfolderBuilder {
 			fields.add(field);
 		});
 
-		return fields;
+		param.put("FIELDS", String.join(Constants.NEW_LINE, fields));
 	}
 }

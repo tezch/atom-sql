@@ -450,10 +450,10 @@ public class Atom<T> {
 	 * @param others 結合対象
 	 * @return 結合された新しい{@link Atom}
 	 */
-	public Atom<T> concat(Atom<?>... others) {
+	public Atom<T> fuse(Atom<?>... others) {
 		var result = this;
 		for (var another : others) {
-			result = result.joinInternal(InnerSql.BLANK, another);
+			result = result.fuseWithInternal(InnerSql.BLANK, another);
 		}
 
 		return result;
@@ -466,17 +466,17 @@ public class Atom<T> {
 	 * @param others 結合対象
 	 * @return 結合された新しい{@link Atom}
 	 */
-	public Atom<T> joinAndConcat(Atom<?> delimiter, Atom<?>... others) {
+	public Atom<T> fuseWith(Atom<?> delimiter, Atom<?>... others) {
 		var result = this;
 		var delimiterPart = delimiter.helper().sql;
 		for (var another : others) {
-			result = result.joinInternal(delimiterPart, another);
+			result = result.fuseWithInternal(delimiterPart, another);
 		}
 
 		return result;
 	}
 
-	private Atom<T> joinInternal(InnerSql delimiter, Atom<?> another) {
+	private Atom<T> fuseWithInternal(InnerSql delimiter, Atom<?> another) {
 		Objects.requireNonNull(another);
 
 		var helper = helper();
@@ -496,10 +496,10 @@ public class Atom<T> {
 	 * @param members 結合対象
 	 * @return 結合された{@link Atom}
 	 */
-	public static Atom<?> join(Atom<?> delimiter, List<Atom<?>> members) {
+	public static Atom<?> interfuse(Atom<?> delimiter, List<Atom<?>> members) {
 		return members.size() == 0
 			? EMPTY
-			: members.get(0).joinAndConcat(delimiter, members.subList(1, members.size()).toArray(Atom<?>[]::new));
+			: members.get(0).fuseWith(delimiter, members.subList(1, members.size()).toArray(Atom<?>[]::new));
 	}
 
 	/**
@@ -511,7 +511,7 @@ public class Atom<T> {
 	public static Atom<?> withBlank(Atom<?>... members) {
 		return members.length == 0
 			? EMPTY
-			: members[0].joinAndConcat(BLANK, Arrays.copyOfRange(members, 1, members.length));
+			: members[0].fuseWith(BLANK, Arrays.copyOfRange(members, 1, members.length));
 	}
 
 	/**
@@ -523,7 +523,7 @@ public class Atom<T> {
 	public static Atom<?> withComma(Atom<?>... members) {
 		return members.length == 0
 			? EMPTY
-			: members[0].joinAndConcat(COMMA, Arrays.copyOfRange(members, 1, members.length));
+			: members[0].fuseWith(COMMA, Arrays.copyOfRange(members, 1, members.length));
 	}
 
 	/**
@@ -533,7 +533,7 @@ public class Atom<T> {
 	 * @return 結合された{@link Atom}
 	 */
 	public static Atom<?> withBlank(List<Atom<?>> members) {
-		return join(BLANK, members);
+		return interfuse(BLANK, members);
 	}
 
 	/**
@@ -543,7 +543,7 @@ public class Atom<T> {
 	 * @return 結合された{@link Atom}
 	 */
 	public static Atom<?> withComma(List<Atom<?>> members) {
-		return join(COMMA, members);
+		return interfuse(COMMA, members);
 	}
 
 	/**
@@ -553,7 +553,7 @@ public class Atom<T> {
 	 * @param atoms 展開する{@link Atom}の配列
 	 * @return 展開された新しい{@link Atom}
 	 */
-	public Atom<T> put(Atom<?>... atoms) {
+	public Atom<T> implant(Atom<?>... atoms) {
 		var helper = helper();
 
 		var sql = helper.sql;
@@ -579,7 +579,7 @@ public class Atom<T> {
 	 * @param atom 展開する{@link Atom}
 	 * @return 展開された新しい{@link Atom}
 	 */
-	public Atom<T> put(String keyword, Atom<?> atom) {
+	public Atom<T> implant(String keyword, Atom<?> atom) {
 		var helper = helper();
 		var sql = helper.sql;
 
@@ -599,7 +599,7 @@ public class Atom<T> {
 	 * @param atoms 変数名をキー、{@link Atom}を値として格納したマップ
 	 * @return 展開された新しい{@link Atom}
 	 */
-	public Atom<T> put(Map<String, Atom<?>> atoms) {
+	public Atom<T> implant(Map<String, Atom<?>> atoms) {
 		var helper = helper();
 		var sql = new InnerSql[] { helper.sql };
 
