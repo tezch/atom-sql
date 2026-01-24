@@ -45,6 +45,7 @@ import io.github.tezch.atomsql.annotation.SqlFile;
 import io.github.tezch.atomsql.annotation.SqlProxy;
 import io.github.tezch.atomsql.annotation.processor.Methods;
 import io.github.tezch.atomsql.annotation.processor.OptionalDatas;
+import io.github.tezch.atomsql.annotation.processor.TooManyColumnsDataObject;
 import io.github.tezch.atomsql.type.INTEGER;
 import io.github.tezch.atomsql.type.NULL;
 
@@ -887,9 +888,20 @@ public class AtomSql {
 		}
 
 		private Object createDefaultConstructorClassDataObject(ResultSet rs) {
+			var tooManyColumnsDataObject = resultClass.getAnnotation(TooManyColumnsDataObject.class);
+
+			Class<?> dataObjectClass;
+
+			if (tooManyColumnsDataObject == null) {
+				dataObjectClass = resultClass;
+			} else {
+				dataObjectClass = tooManyColumnsDataObject.bean();
+			}
+
 			Object object;
+
 			try {
-				var constructor = resultClass.getConstructor();
+				var constructor = dataObjectClass.getConstructor();
 				object = constructor.newInstance();
 			} catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException | InstantiationException e) {
 				throw new IllegalStateException(e);
@@ -928,7 +940,16 @@ public class AtomSql {
 				}
 			});
 
-			return object;
+			if (tooManyColumnsDataObject == null) {
+				return object;
+			}
+
+			try {
+				var constructor = resultClass.getConstructor(tooManyColumnsDataObject.bean());
+				return constructor.newInstance(object);
+			} catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException | InstantiationException e) {
+				throw new IllegalStateException(e);
+			}
 		}
 
 		private class Optionals {

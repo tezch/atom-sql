@@ -70,7 +70,9 @@ class DataObjectBuilder extends SourceBuilder {
 		return new ExtractResult(true, element);
 	}
 
-	private void columns(String sql, List<String> columns, List<String> enumValidators, ExecutableElement method) {
+	private static record Column(String typeExpression, String column) {}
+
+	private void columns(String sql, List<Column> columns, List<String> enumValidators, ExecutableElement method) {
 		var dubplicateChecker = new HashSet<String>();
 
 		ColumnFinder.execute(sql, f -> {
@@ -111,12 +113,30 @@ class DataObjectBuilder extends SourceBuilder {
 					column).ifPresent(enumValidators::add);
 			}
 
-			columns.add(typeExpression + " " + column);
+			columns.add(new Column(typeExpression, column));
 		});
 	}
 
 	@Override
 	String source(String generateClassName, ExecutableElement method, Result result) {
+		var columns = new LinkedList<Column>();
+
+		var enumValidators = new LinkedList<String>();
+
+		columns(result.sql, columns, enumValidators, method);
+
+		if (columns.size() > 100) {
+			return tooManyColumnsDataObject(generateClassName, result, columns, enumValidators);
+		}
+
+		return dataObject(generateClassName, result, columns, enumValidators);
+	}
+
+	private String dataObject(
+		String generateClassName,
+		Result result,
+		List<Column> columns,
+		LinkedList<String> enumValidators) {
 		var template = Formatter.readTemplate(DataObject_Template.class, "UTF-8");
 		template = Formatter.convertToTemplate(template);
 
@@ -127,13 +147,55 @@ class DataObjectBuilder extends SourceBuilder {
 		param.put("PACKAGE", result.packageName.isEmpty() ? "" : ("package " + result.packageName + ";"));
 		param.put("CLASS", generateClassName);
 
-		var columns = new LinkedList<String>();
+		param.put(
+			"COLUMNS",
+			String.join(
+				"," + Constants.NEW_LINE,
+				columns.stream().map(c -> c.typeExpression + " " + c.column).toList()));
 
-		var enumValidators = new LinkedList<String>();
+		param.put("ENUM_VALIDATORS", String.join(Constants.NEW_LINE, enumValidators));
 
-		columns(result.sql, columns, enumValidators, method);
+		return Formatter.format(template, param);
+	}
 
-		param.put("COLUMNS", String.join("," + Constants.NEW_LINE, columns));
+	private String tooManyColumnsDataObject(
+		String generateClassName,
+		Result result,
+		List<Column> columns,
+		LinkedList<String> enumValidators) {
+		var template = Formatter.readTemplate(TooManyColumnsDataObject_Template.class, "UTF-8");
+		template = Formatter.convertToTemplate(template);
+
+		Map<String, String> param = new HashMap<>();
+
+		param.put("GENERATED", this.getClass().getName());
+
+		param.put("PACKAGE", result.packageName.isEmpty() ? "" : ("package " + result.packageName + ";"));
+		param.put("CLASS", generateClassName);
+
+		param.put(
+			"COLUMNS",
+			String.join(
+				Constants.NEW_LINE,
+				columns.stream().map(c -> String.format("public %s %s;", c.typeExpression, c.column)).toList()));
+
+		param.put(
+			"FIELDS",
+			String.join(
+				Constants.NEW_LINE,
+				columns.stream().map(c -> String.format("private final %s %s;", c.typeExpression, c.column)).toList()));
+
+		param.put(
+			"METHODS",
+			String.join(
+				Constants.NEW_LINE,
+				columns.stream().map(c -> String.format("public %s %s() {return %s;}", c.typeExpression, c.column, c.column)).toList()));
+
+		param.put(
+			"BEAN_TO_COLUMNS",
+			String.join(
+				Constants.NEW_LINE,
+				columns.stream().map(c -> String.format("%s = bean.%s;", c.column, c.column)).toList()));
 
 		param.put("ENUM_VALIDATORS", String.join(Constants.NEW_LINE, enumValidators));
 
