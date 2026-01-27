@@ -43,7 +43,7 @@ public interface Endpoint {
 	 * @param logger {@link Logger}
 	 * @param originalSql プレースホルダ変換前のSQL
 	 * @param sql プレースホルダ変換後のSQL
-	 * @param ps プレースホルダ返還後SQLセット済みの{@link PreparedStatement}
+	 * @param ps プレースホルダ変換後SQLセット済みの{@link PreparedStatement}
 	 */
 	void logSql(Logger logger, String originalSql, String sql, PreparedStatement ps);
 
