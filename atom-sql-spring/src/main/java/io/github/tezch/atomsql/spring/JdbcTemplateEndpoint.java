@@ -18,11 +18,12 @@ import io.github.tezch.atomsql.Endpoint;
 import io.github.tezch.atomsql.PreparedStatementSetter;
 import io.github.tezch.atomsql.RowMapper;
 import io.github.tezch.atomsql.SimpleConnectionProxy;
+import io.github.tezch.atomsql.SqlProxySnapshot;
 
 /**
  * @author tezch
  */
-class JdbcTemplateEndpoint implements Endpoint {
+public class JdbcTemplateEndpoint implements Endpoint {
 
 	private final JdbcTemplate jdbcTemplate;
 
@@ -58,7 +59,11 @@ class JdbcTemplateEndpoint implements Endpoint {
 	 * @see JdbcTemplate#queryForStream(String, org.springframework.jdbc.core.PreparedStatementSetter, org.springframework.jdbc.core.RowMapper)
 	 */
 	@Override
-	public <T> Stream<T> queryForStream(String sql, PreparedStatementSetter pss, RowMapper<T> rowMapper) {
+	public <T> Stream<T> queryForStream(
+		String sql,
+		PreparedStatementSetter pss,
+		RowMapper<T> rowMapper,
+		SqlProxySnapshot snapshot) {
 		// MySQLのPareparedStatement#toString()対策でSQLの先頭に改行を付与
 		return jdbcTemplate.queryForStream(Constants.NEW_LINE + sql, (ps) -> pss.setValues(ps), (rs, rowNum) -> rowMapper.mapRow(rs, rowNum));
 	}
@@ -67,13 +72,18 @@ class JdbcTemplateEndpoint implements Endpoint {
 	 * @see JdbcTemplate#update(String, org.springframework.jdbc.core.PreparedStatementSetter)
 	 */
 	@Override
-	public int update(String sql, PreparedStatementSetter pss) {
+	public int update(String sql, PreparedStatementSetter pss, SqlProxySnapshot snapshot) {
 		// MySQLのPareparedStatement#toString()対策でSQLの先頭に改行を付与
 		return jdbcTemplate.update(Constants.NEW_LINE + sql, (ps) -> pss.setValues(ps));
 	}
 
 	@Override
-	public void logSql(Logger logger, String originalSql, String sql, PreparedStatement ps) {
+	public void logSql(
+		Logger logger,
+		String originalSql,
+		String sql,
+		PreparedStatement ps,
+		SqlProxySnapshot snapshot) {
 		logger.log(Level.INFO, "sql:" + Constants.NEW_LINE + ps.toString());
 	}
 

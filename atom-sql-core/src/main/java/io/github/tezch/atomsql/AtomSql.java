@@ -3,6 +3,7 @@ package io.github.tezch.atomsql;
 import java.io.IOException;
 import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
@@ -29,6 +30,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -227,17 +229,26 @@ public class AtomSql {
 			}
 
 			@Override
-			public <T> Stream<T> queryForStream(String sql, PreparedStatementSetter pss, RowMapper<T> rowMapper) {
+			public <T> Stream<T> queryForStream(
+				String sql,
+				PreparedStatementSetter pss,
+				RowMapper<T> rowMapper,
+				SqlProxySnapshot snapshot) {
 				throw new UnsupportedOperationException();
 			}
 
 			@Override
-			public int update(String sql, PreparedStatementSetter pss) {
+			public int update(String sql, PreparedStatementSetter pss, SqlProxySnapshot snapshot) {
 				throw new UnsupportedOperationException();
 			}
 
 			@Override
-			public void logSql(Logger logger, String originalSql, String sql, PreparedStatement ps) {
+			public void logSql(
+				Logger logger,
+				String originalSql,
+				String sql,
+				PreparedStatement ps,
+				SqlProxySnapshot snapshot) {
 				throw new UnsupportedOperationException();
 			}
 
@@ -291,7 +302,7 @@ public class AtomSql {
 		T instance = (T) Proxy.newProxyInstance(
 			Thread.currentThread().getContextClassLoader(),
 			new Class<?>[] { proxyInterface },
-			(proxy, method, args) -> invokeMethod(proxy, method, args));
+			this::invokeMethod);
 
 		return instance;
 	}
@@ -360,6 +371,38 @@ public class AtomSql {
 			mySqlLogger = SqlLogger.disabled;
 		}
 
+		var snapshot = new SqlProxySnapshot() {
+
+			@Override
+			public String getClassName() {
+				return proxyName;
+			}
+
+			@Override
+			public <T extends Annotation> T getClassAnnotation(Class<T> annotationClass) {
+				return proxyInterface.getAnnotation(annotationClass);
+			}
+
+			@Override
+			public String getMethodSignature() {
+				String parameters = Arrays.stream(method.getParameterTypes())
+					.map(Class::getName)
+					.collect(Collectors.joining(", "));
+
+				return String.format("%s(%s)", method.getName(), parameters);
+			}
+
+			@Override
+			public <T extends Annotation> T getMethodAnnotation(Class<T> annotationClass) {
+				return method.getAnnotation(annotationClass);
+			}
+
+			@Override
+			public Annotation[][] getMethodParameterAnnotations() {
+				return method.getParameterAnnotations();
+			}
+		};
+
 		SqlProxyHelper helper;
 		var entry = nameAnnotation.map(a -> endpoints.get(a.value())).orElseGet(() -> endpoints.get());
 		if (parameterTypes.length == 1 && parameterTypes[0].equals(Consumer.class)) {
@@ -414,7 +457,8 @@ public class AtomSql {
 				metadata.result(),
 				values.toArray(Object[]::new),
 				typeFactory,
-				mySqlLogger);
+				mySqlLogger,
+				snapshot);
 		} else {
 			var types = Arrays.stream(metadata.parameterTypes()).map(c -> typeFactory.select(c)).toArray(AtomSqlType[]::new);
 
@@ -427,7 +471,8 @@ public class AtomSql {
 				metadata.result(),
 				args,
 				typeFactory,
-				mySqlLogger);
+				mySqlLogger,
+				snapshot);
 		}
 
 		var atom = new Atom<Object>(AtomSql.this, helper, true);
@@ -654,7 +699,34 @@ public class AtomSql {
 			Object.class,
 			new Object[0],
 			typeFactory,
-			sqlLogger);
+			sqlLogger,
+			new SqlProxySnapshot() {
+
+				@Override
+				public String getMethodSignature() {
+					throw new UnsupportedOperationException();
+				}
+
+				@Override
+				public Annotation[][] getMethodParameterAnnotations() {
+					throw new UnsupportedOperationException();
+				}
+
+				@Override
+				public <T extends Annotation> T getMethodAnnotation(Class<T> annotationClass) {
+					throw new UnsupportedOperationException();
+				}
+
+				@Override
+				public String getClassName() {
+					throw new UnsupportedOperationException();
+				}
+
+				@Override
+				public <T extends Annotation> T getClassAnnotation(Class<T> annotationClass) {
+					throw new UnsupportedOperationException();
+				}
+			});
 	}
 
 	private static void logElapsed(SqlLogger sqlLogger, long startNanos) {
@@ -706,6 +778,8 @@ public class AtomSql {
 
 		private final SqlLogger sqlLogger;
 
+		private final SqlProxySnapshot snapshot;
+
 		private Set<String> confidentials(String[] confidentials, String[] parameterNames) {
 			if (confidentials == null) return Collections.emptySet();
 
@@ -726,11 +800,13 @@ public class AtomSql {
 			Class<?> resultClass,
 			Object[] args,
 			AtomSqlTypeFactory typeFactory,
-			SqlLogger sqlLogger) {
+			SqlLogger sqlLogger,
+			SqlProxySnapshot snapshot) {
 			this.entry = entry;
 			this.resultClass = resultClass;
 			this.typeFactory = typeFactory;
 			this.sqlLogger = sqlLogger;
+			this.snapshot = snapshot;
 
 			Map<String, TypeAndArg> map = new HashMap<>();
 			for (int i = 0; i < parameterNames.length; i++) {
@@ -777,6 +853,7 @@ public class AtomSql {
 			this.resultClass = newDataObjectClass;
 			this.typeFactory = base.typeFactory;
 			this.sqlLogger = base.sqlLogger;
+			this.snapshot = base.snapshot;
 		}
 
 		SqlProxyHelper(
@@ -787,6 +864,11 @@ public class AtomSql {
 			this.resultClass = main.resultClass;
 			this.typeFactory = main.typeFactory;
 			this.sqlLogger = main.sqlLogger;
+			this.snapshot = main.snapshot;
+		}
+
+		SqlProxySnapshot sqlProxySnapshot() {
+			return snapshot;
 		}
 
 		Object createDataObject(ResultSet rs) {
@@ -1030,7 +1112,7 @@ public class AtomSql {
 						logger.log(Level.INFO, name + ": " + value);
 					});
 				} else {
-					entry.endpoint().logSql(logger, sql.originalString(), sql.string(), ps);
+					entry.endpoint().logSql(logger, sql.originalString(), sql.string(), ps, snapshot);
 				}
 
 				logger.log(Level.INFO, "------  SQL END  ------");

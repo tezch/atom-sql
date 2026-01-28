@@ -90,7 +90,11 @@ public class Sandbox {
 		}
 
 		@Override
-		public <T> Stream<T> queryForStream(String sql, PreparedStatementSetter pss, RowMapper<T> rowMapper) {
+		public <T> Stream<T> queryForStream(
+			String sql,
+			PreparedStatementSetter pss,
+			RowMapper<T> rowMapper,
+			SqlProxySnapshot snapshot) {
 			var statement = preparedStatement();
 
 			try {
@@ -119,7 +123,7 @@ public class Sandbox {
 		}
 
 		@Override
-		public int update(String sql, PreparedStatementSetter pss) {
+		public int update(String sql, PreparedStatementSetter pss, SqlProxySnapshot snapshot) {
 			var statement = preparedStatement();
 
 			try {
@@ -132,8 +136,15 @@ public class Sandbox {
 		}
 
 		@Override
-		public void logSql(Logger logger, String originalSql, String sql, PreparedStatement ps) {
+		public void logSql(
+			Logger logger,
+			String originalSql,
+			String sql,
+			PreparedStatement ps,
+			SqlProxySnapshot snapshot) {
 			var handler = pairs.get().stream().filter(p -> p.statement == ps).findFirst().get().handler;
+
+			logger.log(Level.INFO, "method: " + snapshot.getClassName() + "#" + snapshot.getMethodSignature());
 
 			logger.log(Level.INFO, "sql:" + Constants.NEW_LINE + originalSql);
 

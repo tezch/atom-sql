@@ -185,17 +185,26 @@ public class Atom<T> {
 			}
 
 			@Override
-			public <T> Stream<T> queryForStream(String sql, PreparedStatementSetter pss, RowMapper<T> rowMapper) {
+			public <T> Stream<T> queryForStream(
+				String sql,
+				PreparedStatementSetter pss,
+				RowMapper<T> rowMapper,
+				SqlProxySnapshot snapshot) {
 				throw new IllegalAtomException();
 			}
 
 			@Override
-			public int update(String sql, PreparedStatementSetter pss) {
+			public int update(String sql, PreparedStatementSetter pss, SqlProxySnapshot snapshot) {
 				throw new IllegalAtomException();
 			}
 
 			@Override
-			public void logSql(Logger logger, String originalSql, String sql, PreparedStatement ps) {
+			public void logSql(
+				Logger logger,
+				String originalSql,
+				String sql,
+				PreparedStatement ps,
+				SqlProxySnapshot snapshot) {
 				throw new IllegalAtomException();
 			}
 
@@ -321,7 +330,12 @@ public class Atom<T> {
 
 		var startNanos = System.nanoTime();
 		try {
-			return helper.entry.endpoint().queryForStream(helper.sql.string(), helper, mapper);
+			return helper.entry.endpoint()
+				.queryForStream(
+					helper.sql.string(),
+					helper,
+					mapper,
+					helper.sqlProxySnapshot());
 		} finally {
 			helper.logElapsed(startNanos);
 		}
@@ -406,7 +420,7 @@ public class Atom<T> {
 		if (resources == null) {//バッチ実行中ではない
 			var startNanos = System.nanoTime();
 			try {
-				return helper.entry.endpoint().update(helper.sql.string(), helper);
+				return helper.entry.endpoint().update(helper.sql.string(), helper, helper.sqlProxySnapshot());
 			} finally {
 				helper.logElapsed(startNanos);
 			}
@@ -432,7 +446,7 @@ public class Atom<T> {
 		if (resources == null) {//バッチ実行中ではない
 			var startNanos = System.nanoTime();
 			try {
-				resultConsumer.accept(helper.entry.endpoint().update(helper.sql.string(), helper));
+				resultConsumer.accept(helper.entry.endpoint().update(helper.sql.string(), helper, helper.sqlProxySnapshot()));
 
 				return;
 			} finally {
@@ -483,10 +497,7 @@ public class Atom<T> {
 		var anotherHelper = another.helper();
 
 		var sql = concat(delimiter, helper.sql, anotherHelper.sql);
-		return new Atom<T>(
-			atomSql,
-			new SqlProxyHelper(sql, helper),
-			true);
+		return new Atom<T>(atomSql, new SqlProxyHelper(sql, helper), true);
 	}
 
 	/**
@@ -564,10 +575,7 @@ public class Atom<T> {
 			sql = sql.put(pattern, atom.helper().sql);
 		}
 
-		return new Atom<T>(
-			atomSql,
-			new SqlProxyHelper(sql, helper),
-			true);
+		return new Atom<T>(atomSql, new SqlProxyHelper(sql, helper), true);
 	}
 
 	/**
@@ -585,10 +593,7 @@ public class Atom<T> {
 
 		var pattern = pattern(Objects.requireNonNull(keyword));
 
-		return new Atom<T>(
-			atomSql,
-			new SqlProxyHelper(sql.put(pattern, atom.helper().sql), helper),
-			true);
+		return new Atom<T>(atomSql, new SqlProxyHelper(sql.put(pattern, atom.helper().sql), helper), true);
 	}
 
 	/**
@@ -610,10 +615,7 @@ public class Atom<T> {
 			sql[0] = sql[0].put(pattern, atom.helper().sql);
 		});
 
-		return new Atom<T>(
-			atomSql,
-			new SqlProxyHelper(sql[0], helper),
-			true);
+		return new Atom<T>(atomSql, new SqlProxyHelper(sql[0], helper), true);
 	}
 
 	private static Pattern pattern(String keyword) {

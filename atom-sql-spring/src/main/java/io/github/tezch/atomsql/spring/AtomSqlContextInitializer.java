@@ -3,6 +3,8 @@ package io.github.tezch.atomsql.spring;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import io.github.tezch.atomsql.AtomSql;
 import io.github.tezch.atomsql.AtomSqlUtils;
 import io.github.tezch.atomsql.Configure;
+import io.github.tezch.atomsql.Endpoint;
 import io.github.tezch.atomsql.Endpoints;
 import io.github.tezch.atomsql.SimpleConfigure;
 import io.github.tezch.atomsql.annotation.SqlProxy;
@@ -27,8 +30,25 @@ import io.github.tezch.atomsql.annotation.SqlProxy;
  */
 public class AtomSqlContextInitializer implements ApplicationContextInitializer<GenericApplicationContext> {
 
+	private final Function<JdbcTemplate, Endpoint> endpointBuilder;
+
+	/**
+	 * デフォルトコンストラクタです。
+	 */
+	public AtomSqlContextInitializer() {
+		endpointBuilder = jdbcTemplate -> new JdbcTemplateEndpoint(jdbcTemplate);
+	}
+
+	/**
+	 * {@link JdbcTemplate}を利用する{@link Endpoint}を独自に生成するする際に使用するコンストラクタです。
+	 * @param endpointBuilder
+	 */
+	public AtomSqlContextInitializer(Function<JdbcTemplate, Endpoint> endpointBuilder) {
+		this.endpointBuilder = Objects.requireNonNull(endpointBuilder);
+	}
+
 	@Override
-	public void initialize(@SuppressWarnings("exports") GenericApplicationContext context) {
+	public void initialize(GenericApplicationContext context) {
 		AtomSql.initializeIfUninitialized(configure(context));
 
 		List<Class<?>> classes;
@@ -77,17 +97,17 @@ public class AtomSqlContextInitializer implements ApplicationContextInitializer<
 			batchThreshold);
 	}
 
-	private static Endpoints endpoints(GenericApplicationContext context) {
+	private Endpoints endpoints(GenericApplicationContext context) {
 		var map = context.getBeansOfType(JdbcTemplate.class);
 		var primary = context.getBean(JdbcTemplate.class);
 
 		if (map.size() == 1) {
-			return new Endpoints(new JdbcTemplateEndpoint(primary));
+			return new Endpoints(endpointBuilder.apply(primary));
 		}
 
 		var entries = map.entrySet().stream().map(e -> {
 			var jdbcTemplate = e.getValue();
-			return new Endpoints.Entry(e.getKey(), new JdbcTemplateEndpoint(jdbcTemplate), jdbcTemplate == primary);
+			return new Endpoints.Entry(e.getKey(), endpointBuilder.apply(jdbcTemplate), jdbcTemplate == primary);
 		}).toArray(Endpoints.Entry[]::new);
 
 		return new Endpoints(entries);

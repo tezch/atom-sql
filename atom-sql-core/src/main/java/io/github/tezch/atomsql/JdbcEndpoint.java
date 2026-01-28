@@ -51,7 +51,11 @@ public class JdbcEndpoint implements Endpoint {
 	}
 
 	@Override
-	public <T> Stream<T> queryForStream(String sql, PreparedStatementSetter pss, RowMapper<T> rowMapper) {
+	public <T> Stream<T> queryForStream(
+		String sql,
+		PreparedStatementSetter pss,
+		RowMapper<T> rowMapper,
+		SqlProxySnapshot snapshot) {
 		try {
 			var conn = connection();
 
@@ -90,7 +94,7 @@ public class JdbcEndpoint implements Endpoint {
 	}
 
 	@Override
-	public int update(String sql, PreparedStatementSetter pss) {
+	public int update(String sql, PreparedStatementSetter pss, SqlProxySnapshot snapshot) {
 		try (var conn = connection()) {
 			try (var ps = conn.prepareStatement(Constants.NEW_LINE + sql)) {
 				pss.setValues(ps);
@@ -103,7 +107,12 @@ public class JdbcEndpoint implements Endpoint {
 	}
 
 	@Override
-	public void logSql(Logger logger, String originalSql, String sql, PreparedStatement ps) {
+	public void logSql(
+		Logger logger,
+		String originalSql,
+		String sql,
+		PreparedStatement ps,
+		SqlProxySnapshot snapshot) {
 		logger.log(Level.INFO, "sql:" + Constants.NEW_LINE + ps.toString());
 	}
 

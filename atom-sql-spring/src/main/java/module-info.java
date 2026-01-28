@@ -4,13 +4,13 @@
  */
 module io.github.tezch.atomsql.spring {
 
-	requires io.github.tezch.atomsql.core;
+	requires transitive io.github.tezch.atomsql.core;
 
 	requires spring.beans;
 
-	requires spring.context;
+	requires transitive spring.context;
 
-	requires spring.jdbc;
+	requires transitive spring.jdbc;
 
 	requires spring.core;
 
