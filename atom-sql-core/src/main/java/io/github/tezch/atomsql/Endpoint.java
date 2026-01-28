@@ -2,6 +2,7 @@ package io.github.tezch.atomsql;
 
 import java.lang.System.Logger;
 import java.sql.PreparedStatement;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -48,11 +49,39 @@ public interface Endpoint {
 	 * @param ps プレースホルダ変換後SQLセット済みの{@link PreparedStatement}
 	 * @param snapshot {@link SqlProxySnapshot}
 	 */
-	void logSql(Logger logger, String originalSql, String sql, PreparedStatement ps, SqlProxySnapshot snapshot);
+	void logSql(
+		Logger logger,
+		String originalSql,
+		String sql,
+		PreparedStatement ps,
+		SqlProxySnapshot snapshot);
+
+	/**
+	 * SQLログ出力を行う設定にしている場合、実装に合わせたSQL文をログ出力します。
+	 * @see Configure#enableLog
+	 * @param logger {@link Logger}
+	 * @param originalSql プレースホルダ変換前のSQL
+	 * @param sql プレースホルダ変換後のSQL
+	 * @param bindingValues セットされた値の文字列表現
+	 * @param snapshot {@link SqlProxySnapshot}
+	 */
+	void logConfidentialSql(
+		Logger logger,
+		String originalSql,
+		String sql,
+		List<BindingValue> bindingValues,
+		SqlProxySnapshot snapshot);
 
 	/**
 	 * {@link ConnectionProxy}を使用して行う処理を実施します。
 	 * @param consumer
 	 */
 	void bollowConnection(Consumer<ConnectionProxy> consumer);
+
+	/**
+	 * BindingValue
+	 * @param name プレースホルダ名
+	 * @param value 文字列化された値
+	 */
+	static record BindingValue(String name, String value) {}
 }

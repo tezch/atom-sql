@@ -161,6 +161,24 @@ public class Sandbox {
 		}
 
 		@Override
+		public void logConfidentialSql(
+			Logger logger,
+			String originalSql,
+			String sql,
+			List<BindingValue> bindingValues,
+			SqlProxySnapshot snapshot) {
+			logger.log(Level.INFO, "method: " + snapshot.getClassName() + "#" + snapshot.getMethodSignature());
+
+			logger.log(Level.INFO, "sql:" + Constants.NEW_LINE + originalSql);
+
+			logger.log(Level.INFO, "processed sql:" + Constants.NEW_LINE + sql);
+
+			logger.log(Level.INFO, "binding values:");
+
+			bindingValues.forEach(p -> logger.log(Level.INFO, p.name() + ": " + p.value()));
+		}
+
+		@Override
 		public void bollowConnection(Consumer<ConnectionProxy> consumer) {
 			throw new UnsupportedOperationException();
 		}

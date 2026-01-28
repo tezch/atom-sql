@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import io.github.tezch.atomsql.Endpoint.BindingValue;
 import io.github.tezch.atomsql.InnerSql.Element;
 import io.github.tezch.atomsql.InnerSql.Placeholder;
 import io.github.tezch.atomsql.InnerSql.Text;
@@ -248,6 +249,16 @@ public class AtomSql {
 				String originalSql,
 				String sql,
 				PreparedStatement ps,
+				SqlProxySnapshot snapshot) {
+				throw new UnsupportedOperationException();
+			}
+
+			@Override
+			public void logConfidentialSql(
+				Logger logger,
+				String originalSql,
+				String sql,
+				List<BindingValue> bindingValues,
 				SqlProxySnapshot snapshot) {
 				throw new UnsupportedOperationException();
 			}
@@ -1097,11 +1108,7 @@ public class AtomSql {
 				var placeholders = sql.placeholders();
 
 				if (placeholders.stream().filter(p -> p.confidential()).findFirst().isPresent()) {
-					logger.log(Level.INFO, "confidential sql:" + Constants.NEW_LINE + sql.originalString());
-					logger.log(Level.INFO, "binding values:");
-
-					placeholders.forEach(p -> {
-						String name = p.name();
+					var bindingValues = placeholders.stream().map(p -> {
 						String value;
 						if (p.confidential()) {
 							value = Constants.CONFIDENTIAL;
@@ -1109,10 +1116,24 @@ public class AtomSql {
 							value = AtomSqlUtils.toStringForBindingValue(p.value());
 						}
 
-						logger.log(Level.INFO, name + ": " + value);
-					});
+						return new BindingValue(p.name(), value);
+					}).toList();
+
+					entry.endpoint()
+						.logConfidentialSql(
+							logger,
+							sql.originalString(),
+							sql.string(),
+							bindingValues,
+							snapshot);
 				} else {
-					entry.endpoint().logSql(logger, sql.originalString(), sql.string(), ps, snapshot);
+					entry.endpoint()
+						.logSql(
+							logger,
+							sql.originalString(),
+							sql.string(),
+							ps,
+							snapshot);
 				}
 
 				logger.log(Level.INFO, "------  SQL END  ------");

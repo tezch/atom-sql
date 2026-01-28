@@ -209,6 +209,16 @@ public class Atom<T> {
 			}
 
 			@Override
+			public void logConfidentialSql(
+				Logger logger,
+				String originalSql,
+				String sql,
+				List<BindingValue> bindingValues,
+				SqlProxySnapshot snapshot) {
+				throw new IllegalAtomException();
+			}
+
+			@Override
 			public void bollowConnection(Consumer<ConnectionProxy> consumer) {
 				throw new IllegalAtomException();
 			}

@@ -4,6 +4,7 @@ import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -85,6 +86,19 @@ public class JdbcTemplateEndpoint implements Endpoint {
 		PreparedStatement ps,
 		SqlProxySnapshot snapshot) {
 		logger.log(Level.INFO, "sql:" + Constants.NEW_LINE + ps.toString());
+	}
+
+	@Override
+	public void logConfidentialSql(
+		Logger logger,
+		String originalSql,
+		String sql,
+		List<BindingValue> bindingValues,
+		SqlProxySnapshot snapshot) {
+		logger.log(Level.INFO, "confidential sql:" + Constants.NEW_LINE + originalSql);
+		logger.log(Level.INFO, "binding values:");
+
+		bindingValues.forEach(p -> logger.log(Level.INFO, p.name() + ": " + p.value()));
 	}
 
 	@Override
