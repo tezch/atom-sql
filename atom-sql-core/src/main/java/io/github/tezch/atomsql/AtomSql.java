@@ -715,15 +715,21 @@ public class AtomSql {
 		tryNonThreadSafe(() -> endpoints.get(qualifier).endpoint().bollowConnection(consumer));
 	}
 
+	private static final String[] emptyStringArray = {};
+
+	private static final AtomSqlType[] emptyAtomSqlTypeArray = {};
+
+	private static final Object[] emptyObjectArray = {};
+
 	SqlProxyHelper helper(SecureString sql) {
 		return new SqlProxyHelper(
 			sql,
 			endpoints.get(),
 			null,
-			new String[0],
-			new AtomSqlType[0],
+			emptyStringArray,
+			emptyAtomSqlTypeArray,
 			Object.class,
-			new Object[0],
+			emptyObjectArray,
 			typeFactory,
 			sqlLogger,
 			new SqlProxySnapshot() {
