@@ -309,6 +309,13 @@ public class AtomSql {
 		return instance;
 	}
 
+	/**
+	 * {@link Atom}キャッシュをクリアします。
+	 */
+	public void clearAtomCache() {
+		atomCache.clear();
+	}
+
 	private static record CacheValue(Atom<Object> atom, io.github.tezch.atomsql.annotation.processor.Method metadata) {}
 
 	private final Map<Method, CacheValue> atomCache = new ConcurrentHashMap<>();
