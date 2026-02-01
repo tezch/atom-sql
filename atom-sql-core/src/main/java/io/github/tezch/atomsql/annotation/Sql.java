@@ -1,5 +1,6 @@
 package io.github.tezch.atomsql.annotation;
 
+import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
@@ -13,7 +14,7 @@ import io.github.tezch.atomsql.Atom;
  * 完全なSQLである必要はなく、{@link Atom}を使用して結合等の操作が可能です。
  * @author tezch
  */
-@Target(METHOD)
+@Target({ METHOD, FIELD })
 @Retention(RUNTIME)
 public @interface Sql {
 

@@ -1,7 +1,6 @@
 package io.github.tezch.atomsql;
 
-import java.lang.System.Logger;
-import java.sql.PreparedStatement;
+import java.lang.reflect.Field;
 import java.sql.ResultSet;
 import java.util.Arrays;
 import java.util.List;
@@ -14,8 +13,9 @@ import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-import io.github.tezch.atomsql.AtomSql.SqlProxyHelper;
 import io.github.tezch.atomsql.annotation.DataObject;
+import io.github.tezch.atomsql.annotation.Sql;
+import io.github.tezch.atomsql.annotation.SqlName;
 import io.github.tezch.atomsql.annotation.SqlProxy;
 
 /**
@@ -130,6 +130,10 @@ public class Atom<T> {
 	 */
 	public static final Atom<?> OR = newInstance("OR");
 
+	private static final SecureString leftParenthesis = new SecureString("(");
+
+	private static final SecureString rightParenthesis = new SecureString(")");
+
 	private final AtomSql atomSql;
 
 	private final Supplier<SqlProxyHelper> helperSupplier;
@@ -162,7 +166,63 @@ public class Atom<T> {
 
 	private static Atom<?> newInstance(String sql) {
 		var atomSql = new AtomSql();
-		return new Atom<>(atomSql, atomSql.helper(sql), true);
+		return new Atom<>(atomSql, atomSql.helper(new SecureString(sql)), true);
+	}
+
+	/**
+	 * フィールドに付与された{@link Sql}または{@link SqlName}からインスタンスを生成します。<br>
+	 * {@link SqlName}の場合、フィールド名がその値となります。<br>
+	 * このメソッドは呼び出されるたびに新たに{@link Atom}のインスタンスを生成するので、使用する側で適宜キャッシュ等を行ってください。<br>
+	 * 生成されたインスタンスはスレッドセーフであり、static変数に保存し使用することが可能です。<br>
+	 * このメソッドで生成されたインスタンスでは、検索等のデータベース操作を行うことはできません。<br>
+	 * 通常生成されたAtomインスタンスに結合するためだけに使用してください。<br>
+	 * また、このメソッドを呼ぶ前に初期化が完了している必要があります。
+	 * @param field {@link Sql}または{@link SqlName}が付与されているフィールド
+	 * @return アノテーションが付与されていない場合空の{@link Optional}
+	 */
+	public static Optional<Atom<?>> of(Field field) {
+		var sql = field.getAnnotation(Sql.class);
+
+		if (sql != null)
+			return Optional.of(newInstance(sql.value()));
+
+		var sqlName = field.getAnnotation(SqlName.class);
+
+		if (sqlName != null) {
+			var name = field.getName();
+
+			name = switch (sqlName.casing()) {
+			case LOWER:
+				yield name.toLowerCase();
+			case UPPER:
+				yield name.toUpperCase();
+			case ORIGINAL:
+				yield name;
+			};
+
+			return Optional.of(newInstance(name));
+		}
+
+		return Optional.empty();
+	}
+
+	/**
+	 * enumの要素に付与された{@link Sql}または{@link SqlName}からインスタンスを生成します。<br>
+	 * {@link SqlName}の場合、要素名がその値となります。<br>
+	 * このメソッドは呼び出されるたびに新たに{@link Atom}のインスタンスを生成するので、使用する側で適宜キャッシュ等を行ってください。<br>
+	 * 生成されたインスタンスはスレッドセーフであり、static変数に保存し使用することが可能です。<br>
+	 * このメソッドで生成されたインスタンスでは、検索等のデータベース操作を行うことはできません。<br>
+	 * 通常生成されたAtomインスタンスに結合するためだけに使用してください。<br>
+	 * また、このメソッドを呼ぶ前に初期化が完了している必要があります。
+	 * @param enumConstant {@link Sql}または{@link SqlName}が付与されているenumの要素
+	 * @return アノテーションが付与されていない場合空の{@link Optional}
+	 */
+	public static <E extends Enum<E>> Optional<Atom<?>> of(Enum<E> enumConstant) {
+		try {
+			return of(enumConstant.getDeclaringClass().getDeclaredField(enumConstant.name()));
+		} catch (NoSuchFieldException e) {
+			throw new IllegalStateException(e);
+		}
 	}
 
 	/**
@@ -172,57 +232,11 @@ public class Atom<T> {
 	 * 通常生成されたAtomインスタンスに結合するためだけに使用してください。<br>
 	 * また、このメソッドを呼ぶ前に初期化が完了している必要があります。
 	 * @see AtomSql#initialize(Configure)
-	 * @see IllegalAtomException
-	 * @param creator
+	 * @param creator {@link Function}
 	 * @return creator内で生成されたインスタンス
 	 */
-	public static Atom<?> newStaticInstance(Function<AtomSql, Atom<?>> creator) {
-		return creator.apply(new AtomSql(new Endpoints(new Endpoint() {
-
-			@Override
-			public int[] batchUpdate(String sql, BatchPreparedStatementSetter bpss) {
-				throw new IllegalAtomException();
-			}
-
-			@Override
-			public <T> Stream<T> queryForStream(
-				String sql,
-				PreparedStatementSetter pss,
-				RowMapper<T> rowMapper,
-				SqlProxySnapshot snapshot) {
-				throw new IllegalAtomException();
-			}
-
-			@Override
-			public int update(String sql, PreparedStatementSetter pss, SqlProxySnapshot snapshot) {
-				throw new IllegalAtomException();
-			}
-
-			@Override
-			public void logSql(
-				Logger logger,
-				String originalSql,
-				String sql,
-				PreparedStatement ps,
-				SqlProxySnapshot snapshot) {
-				throw new IllegalAtomException();
-			}
-
-			@Override
-			public void logConfidentialSql(
-				Logger logger,
-				String originalSql,
-				String sql,
-				List<BindingValue> bindingValues,
-				SqlProxySnapshot snapshot) {
-				throw new IllegalAtomException();
-			}
-
-			@Override
-			public void bollowConnection(Consumer<ConnectionProxy> consumer) {
-				throw new IllegalAtomException();
-			}
-		})));
+	public static Atom<?> of(Function<AtomSql, Atom<?>> creator) {
+		return creator.apply(new AtomSql());
 	}
 
 	/**
@@ -682,7 +696,7 @@ public class Atom<T> {
 
 	private static InnerSql guardSql(boolean andType, boolean andTypeCurrent, SqlProxyHelper helper) {
 		if (!andType && andTypeCurrent) {//現在ORでAND追加された場合
-			return helper.sql.isBlank() ? InnerSql.EMPTY : helper.sql.join("(", ")");
+			return helper.sql.isBlank() ? InnerSql.EMPTY : helper.sql.join(leftParenthesis, rightParenthesis);
 		}
 
 		return helper.sql;

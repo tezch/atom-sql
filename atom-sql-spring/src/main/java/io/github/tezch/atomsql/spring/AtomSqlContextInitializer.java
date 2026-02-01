@@ -80,21 +80,24 @@ public class AtomSqlContextInitializer implements ApplicationContextInitializer<
 
 		var logStackTracePattern = environment.getProperty("atomsql.log-stacktrace-pattern", ".+");
 
-		var ignoreNoSqlLog = environment.getProperty("atomsql.ignore-no-sql-log", Boolean.class, false);
+		var shouldIgnoreNoSqlLog = environment.getProperty("atomsql.should-ignore-no-sql-log", Boolean.class, false);
 
-		var useQualifier = environment.getProperty("atomsql.use-qualifier", Boolean.class, false);
+		var usesQualifier = environment.getProperty("atomsql.uses-qualifier", Boolean.class, false);
 
 		var typeFactoryClass = environment.getProperty("atomsql.type-factory-class", "");
 
 		var batchThreshold = environment.getProperty("atomsql.batch-threshold", Integer.class, 0);
 
+		var usesAtomCache = environment.getProperty("atomsql.uses-atom-cache", Boolean.class, true);
+
 		return new SimpleConfigure(
 			enableLog,
 			Pattern.compile(logStackTracePattern),
-			ignoreNoSqlLog,
-			useQualifier,
+			shouldIgnoreNoSqlLog,
+			usesQualifier,
 			typeFactoryClass,
-			batchThreshold);
+			batchThreshold,
+			usesAtomCache);
 	}
 
 	private Endpoints endpoints(GenericApplicationContext context) {

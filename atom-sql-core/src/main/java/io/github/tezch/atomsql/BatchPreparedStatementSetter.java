@@ -16,6 +16,12 @@ public interface BatchPreparedStatementSetter {
 	void setValues(PreparedStatement ps, int i) throws SQLException;
 
 	/**
+	 * @param i
+	 * @return {@link SqlProxySnapshot}
+	 */
+	SqlProxySnapshot sqlProxySnapshot(int i);
+
+	/**
 	 * @return int
 	 */
 	int getBatchSize();

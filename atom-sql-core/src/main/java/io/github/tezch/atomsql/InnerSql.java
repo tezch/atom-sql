@@ -8,13 +8,13 @@ import java.util.regex.Pattern;
 
 class InnerSql {
 
-	static final InnerSql EMPTY = new InnerSql("");
+	static final InnerSql EMPTY = new InnerSql(new SecureString(""));
 
-	static final InnerSql BLANK = new InnerSql(" ");
+	static final InnerSql BLANK = new InnerSql(new SecureString(" "));
 
-	static final InnerSql AND = new InnerSql(" AND ");
+	static final InnerSql AND = new InnerSql(new SecureString(" AND "));
 
-	static final InnerSql OR = new InnerSql(" OR ");
+	static final InnerSql OR = new InnerSql(new SecureString(" OR "));
 
 	static interface Element {
 
@@ -33,25 +33,25 @@ class InnerSql {
 		boolean isBlank();
 	}
 
-	static record Text(String text) implements Element {
+	static record Text(SecureString text) implements Element {
 
 		@Override
 		public void put(Pattern pattern, InnerSql another, List<Element> elements) {
-			String remain = text;
+			String remain = text.toString();
 			while (true) {
 				var matcher = pattern.matcher(remain);
 
 				if (!matcher.find())
 					break;
 
-				elements.add(new Text(remain.substring(0, matcher.start())));
+				elements.add(new Text(new SecureString(remain.substring(0, matcher.start()))));
 
 				remain = remain.substring(matcher.end());
 
 				elements.addAll(another.elements);
 			}
 
-			elements.add(new Text(remain));
+			elements.add(new Text(new SecureString(remain)));
 		}
 
 		@Override
@@ -74,19 +74,19 @@ class InnerSql {
 
 		@Override
 		public boolean isEmpty() {
-			return text.isEmpty();
+			return text.toString().isEmpty();
 		}
 
 		@Override
 		public boolean isBlank() {
-			return text.isBlank();
+			return text.toString().isBlank();
 		}
 	}
 
 	static record Placeholder(
-		String name, //プレースホルダ名
+		SecureString name, //プレースホルダ名
 		boolean confidential,
-		String expression, //置換後のプレースホルダ
+		SecureString expression, //置換後のプレースホルダ
 		String original, //元のプレースホルダ文字列全体（型ヒントを含む）
 		AtomSqlType type, //型
 		Object value, //値
@@ -135,7 +135,7 @@ class InnerSql {
 		this.elements = Collections.unmodifiableList(new LinkedList<>(elements));
 	}
 
-	InnerSql(String text) {
+	InnerSql(SecureString text) {
 		this.elements = Collections.singletonList(new Text(text));
 	}
 
@@ -179,7 +179,7 @@ class InnerSql {
 		return new InnerSql(elements);
 	}
 
-	InnerSql join(String prefix, String suffix) {
+	InnerSql join(SecureString prefix, SecureString suffix) {
 		List<Element> elements = new LinkedList<>();
 		elements.add(new Text(prefix));
 		elements.addAll(this.elements);

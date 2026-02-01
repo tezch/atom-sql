@@ -7,6 +7,7 @@ import java.util.regex.Pattern;
 
 import io.github.tezch.atomsql.annotation.NoSqlLog;
 import io.github.tezch.atomsql.annotation.Qualifier;
+import io.github.tezch.atomsql.annotation.SqlProxy;
 
 /**
  * Atom SQL用の設定をロードし、保持するクラスです。
@@ -31,14 +32,14 @@ public class PropertiesConfigure implements Configure {
 	private final Pattern logStackTracePattern;
 
 	/**
-	 * ignore-no-sql-log<br>
+	 * should-ignore-no-sql-log<br>
 	 * アノテーション{@link NoSqlLog}が付与されていても、それを無視してSQLログを出力するかどうか<br>
 	 * 無視してSQLのログ出力を行う場合、true
 	 */
-	private final boolean ignoreNoSqlLog;
+	private final boolean shouldIgnoreNoSqlLog;
 
 	/**
-	 * use-qualifier<br>
+	 * uses-qualifier<br>
 	 * {@link Qualifier}を使用するかどうか
 	 */
 	private final boolean usesQualifier;
@@ -58,6 +59,12 @@ public class PropertiesConfigure implements Configure {
 	private final int batchThreshold;
 
 	/**
+	 * uses-atom-cache<br>
+	 * {@link SqlProxy}のメソッド呼び出しで生成される{@link Atom}をキャッシュするかどうか
+	 */
+	private final boolean usesAtomCache;
+
+	/**
 	 * クラスパスのルートにあるatom-sql.propertiesから設定を読み込みインスタンスを作成します。
 	 */
 	public PropertiesConfigure() {
@@ -74,13 +81,15 @@ public class PropertiesConfigure implements Configure {
 
 		logStackTracePattern = Pattern.compile(config.getProperty("log-stacktrace-pattern", ".+"));
 
-		ignoreNoSqlLog = Boolean.valueOf(config.getProperty("ignore-no-sql-log", "false"));
+		shouldIgnoreNoSqlLog = Boolean.valueOf(config.getProperty("should-ignore-no-sql-log", "false"));
 
-		usesQualifier = Boolean.valueOf(config.getProperty("use-qualifier", "false"));
+		usesQualifier = Boolean.valueOf(config.getProperty("uses-qualifier", "false"));
 
 		typeFactoryClass = config.getProperty("type-factory-class", null);
 
 		batchThreshold = Integer.parseInt(config.getProperty("batch-threshold", "0"));
+
+		usesAtomCache = Boolean.valueOf(config.getProperty("uses-atom-cache", "true"));
 	}
 
 	@Override
@@ -94,8 +103,8 @@ public class PropertiesConfigure implements Configure {
 	}
 
 	@Override
-	public boolean ignoreNoSqlLog() {
-		return ignoreNoSqlLog;
+	public boolean shouldIgnoreNoSqlLog() {
+		return shouldIgnoreNoSqlLog;
 	}
 
 	@Override
@@ -111,5 +120,10 @@ public class PropertiesConfigure implements Configure {
 	@Override
 	public int batchThreshold() {
 		return batchThreshold;
+	}
+
+	@Override
+	public boolean usesAtomCache() {
+		return usesAtomCache;
 	}
 }

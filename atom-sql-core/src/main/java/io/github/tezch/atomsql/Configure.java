@@ -4,6 +4,7 @@ import java.util.regex.Pattern;
 
 import io.github.tezch.atomsql.annotation.NoSqlLog;
 import io.github.tezch.atomsql.annotation.Qualifier;
+import io.github.tezch.atomsql.annotation.SqlProxy;
 
 /**
  * Atom SQL用の設定をロードし、保持するクラスです。
@@ -28,15 +29,15 @@ public interface Configure {
 	Pattern logStackTracePattern();
 
 	/**
-	 * ignore-no-sql-log<br>
+	 * should-ignore-no-sql-log<br>
 	 * アノテーション{@link NoSqlLog}が付与されていても、それを無視してSQLログを出力するかどうか<br>
 	 * 無視してSQLのログ出力を行う場合、true
 	 * @return {@link NoSqlLog}を無視するか
 	 */
-	boolean ignoreNoSqlLog();
+	boolean shouldIgnoreNoSqlLog();
 
 	/**
-	 * use-qualifier<br>
+	 * uses-qualifier<br>
 	 * {@link Qualifier}を使用するかどうか
 	 * @return 使用する場合、true
 	 */
@@ -56,4 +57,11 @@ public interface Configure {
 	 * @return バッチ更新時の閾値
 	 */
 	int batchThreshold();
+
+	/**
+	 * uses-atom-cache<br>
+	 * {@link SqlProxy}のメソッド呼び出しで生成される{@link Atom}をキャッシュするかどうか
+	 * @return 使用する場合、true
+	 */
+	boolean usesAtomCache();
 }
