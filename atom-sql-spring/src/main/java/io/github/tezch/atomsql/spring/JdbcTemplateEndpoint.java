@@ -53,7 +53,6 @@ public class JdbcTemplateEndpoint implements Endpoint {
 				return bpss.getBatchSize();
 			}
 		});
-
 	}
 
 	/**
