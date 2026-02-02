@@ -15,7 +15,6 @@ import java.util.stream.Stream;
 
 import io.github.tezch.atomsql.annotation.DataObject;
 import io.github.tezch.atomsql.annotation.Sql;
-import io.github.tezch.atomsql.annotation.SqlName;
 import io.github.tezch.atomsql.annotation.SqlProxy;
 
 /**
@@ -130,9 +129,9 @@ public class Atom<T> {
 	 */
 	public static final Atom<?> OR = newInstance("OR");
 
-	private static final SecureString leftParenthesis = new SecureString("(");
+	private static final SecureString leftParen = new SecureString("(");
 
-	private static final SecureString rightParenthesis = new SecureString(")");
+	private static final SecureString rightParen = new SecureString(")");
 
 	private final AtomSql atomSql;
 
@@ -155,6 +154,12 @@ public class Atom<T> {
 		this.andType = andType;
 	}
 
+	private Atom(AtomSql atomsql, Supplier<SqlProxyHelper> helperSupplier, boolean andType) {
+		this.atomSql = atomsql;
+		this.helperSupplier = helperSupplier;
+		this.andType = andType;
+	}
+
 	@SuppressWarnings("unchecked")
 	private RowMapper<T> dataObjectCreator() {
 		return (r, n) -> (T) helper().createDataObject(r);
@@ -169,55 +174,109 @@ public class Atom<T> {
 		return new Atom<>(atomSql, atomSql.helper(new SecureString(sql)), true);
 	}
 
-	/**
-	 * フィールドに付与された{@link Sql}または{@link SqlName}からインスタンスを生成します。<br>
-	 * {@link SqlName}の場合、フィールド名がその値となります。<br>
-	 * このメソッドは呼び出されるたびに新たに{@link Atom}のインスタンスを生成するので、使用する側で適宜キャッシュ等を行ってください。<br>
-	 * 生成されたインスタンスはスレッドセーフであり、static変数に保存し使用することが可能です。<br>
-	 * このメソッドで生成されたインスタンスでは、検索等のデータベース操作を行うことはできません。<br>
-	 * 通常生成されたAtomインスタンスに結合するためだけに使用してください。<br>
-	 * また、このメソッドを呼ぶ前に初期化が完了している必要があります。
-	 * @param field {@link Sql}または{@link SqlName}が付与されているフィールド
-	 * @return アノテーションが付与されていない場合空の{@link Optional}
-	 */
-	public static Optional<Atom<?>> of(Field field) {
-		var sql = field.getAnnotation(Sql.class);
+	private static class Holder<T> {
 
-		if (sql != null)
-			return Optional.of(newInstance(sql.value()));
+		private T value;
 
-		var sqlName = field.getAnnotation(SqlName.class);
-
-		if (sqlName != null) {
-			var name = field.getName();
-
-			name = switch (sqlName.casing()) {
-			case LOWER:
-				yield name.toLowerCase();
-			case UPPER:
-				yield name.toUpperCase();
-			case ORIGINAL:
-				yield name;
-			};
-
-			return Optional.of(newInstance(name));
+		private T get() {
+			return value;
 		}
 
-		return Optional.empty();
+		private void set(T value) {
+			this.value = value;
+		}
 	}
 
 	/**
-	 * enumの要素に付与された{@link Sql}または{@link SqlName}からインスタンスを生成します。<br>
-	 * {@link SqlName}の場合、要素名がその値となります。<br>
+	 * {@link Atom}の簡易生成メソッドです。<br>
+	 * このメソッドで生成されたインスタンスを、このメソッドを使用したクラスのstaticフィールドに格納する必要があります。<br>
+	 * {@link Atom}は、格納されたフィールドに付与された{@link Sql}またはフィールド名の値を持ちます。<br>
+	 * 生成されたインスタンスはスレッドセーフであり、static変数に保存し使用することが可能です。<br>
+	 * このメソッドで生成されたインスタンスでは、検索等のデータベース操作を行うことはできません。<br>
+	 * 通常生成されたAtomインスタンスに結合するためだけに使用してください。<br>
+	 * @return {@link Atom}
+	 */
+	public static Atom<?> of() {
+		var atomSql = new AtomSql();
+
+		var atomHolder = new Holder<Atom<?>>();
+
+		var helperHolder = new Holder<SqlProxyHelper>();
+
+		var caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
+
+		var atom = new Atom<>(atomSql, () -> {
+			synchronized (helperHolder) {
+				var helper = helperHolder.get();
+				if (helper != null) return helper;
+
+				var sql = Arrays.stream(caller.getDeclaredFields())
+					.filter(f -> {
+						f.setAccessible(true);
+
+						try {
+							synchronized (atomHolder) {
+								return atomHolder.get() == f.get(null);
+							}
+						} catch (Exception e) {
+							e.printStackTrace();
+							return false;
+						}
+					})
+					.findFirst()
+					.map(Atom::extractForm)
+					//自分自身が見つからなかった
+					.orElseThrow(() -> new IllegalStateException("Atom must be a static field in the calling class"));
+
+				helper = atomSql.helper(new SecureString(sql));
+
+				helperHolder.set(helper);
+
+				return helper;
+			}
+		}, true);
+
+		synchronized (atomHolder) {
+			atomHolder.set(atom);
+		}
+
+		return atom;
+	}
+
+	/**
+	 * フィールドに付与された{@link Sql}またはフィールド名からインスタンスを生成します。<br>
 	 * このメソッドは呼び出されるたびに新たに{@link Atom}のインスタンスを生成するので、使用する側で適宜キャッシュ等を行ってください。<br>
 	 * 生成されたインスタンスはスレッドセーフであり、static変数に保存し使用することが可能です。<br>
 	 * このメソッドで生成されたインスタンスでは、検索等のデータベース操作を行うことはできません。<br>
 	 * 通常生成されたAtomインスタンスに結合するためだけに使用してください。<br>
 	 * また、このメソッドを呼ぶ前に初期化が完了している必要があります。
-	 * @param enumConstant {@link Sql}または{@link SqlName}が付与されているenumの要素
-	 * @return アノテーションが付与されていない場合空の{@link Optional}
+	 * @param field {@link Field}
+	 * @return {@link Atom}
 	 */
-	public static <E extends Enum<E>> Optional<Atom<?>> of(Enum<E> enumConstant) {
+	public static Atom<?> of(Field field) {
+		return newInstance(extractForm(field));
+	}
+
+	private static String extractForm(Field field) {
+		var sql = field.getAnnotation(Sql.class);
+
+		if (sql != null)
+			return sql.value();
+
+		return field.getName();
+	}
+
+	/**
+	 * enumの要素に付与された{@link Sql}または要素名からインスタンスを生成します。<br>
+	 * このメソッドは呼び出されるたびに新たに{@link Atom}のインスタンスを生成するので、使用する側で適宜キャッシュ等を行ってください。<br>
+	 * 生成されたインスタンスはスレッドセーフであり、static変数に保存し使用することが可能です。<br>
+	 * このメソッドで生成されたインスタンスでは、検索等のデータベース操作を行うことはできません。<br>
+	 * 通常生成されたAtomインスタンスに結合するためだけに使用してください。<br>
+	 * また、このメソッドを呼ぶ前に初期化が完了している必要があります。
+	 * @param enumConstant enumの要素
+	 * @return {@link Atom}
+	 */
+	public static <E extends Enum<E>> Atom<?> of(Enum<E> enumConstant) {
 		try {
 			return of(enumConstant.getDeclaringClass().getDeclaredField(enumConstant.name()));
 		} catch (NoSuchFieldException e) {
@@ -696,7 +755,7 @@ public class Atom<T> {
 
 	private static InnerSql guardSql(boolean andType, boolean andTypeCurrent, SqlProxyHelper helper) {
 		if (!andType && andTypeCurrent) {//現在ORでAND追加された場合
-			return helper.sql.isBlank() ? InnerSql.EMPTY : helper.sql.join(leftParenthesis, rightParenthesis);
+			return helper.sql.isBlank() ? InnerSql.EMPTY : helper.sql.join(leftParen, rightParen);
 		}
 
 		return helper.sql;
