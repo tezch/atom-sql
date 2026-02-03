@@ -167,8 +167,6 @@ class ProcessorUtils {
 
 		var typeName = type.getQualifiedName().toString();
 
-		if (typeName.equals(Enum.class.getCanonicalName())) return true;
-
 		return Arrays.stream(ProcessorTypeFactory.instance.atomSqlTypeFactory.nonPrimitiveTypes())
 			.map(t -> t.type())
 			.filter(c -> typeName.equals(c.getCanonicalName()))

@@ -7,7 +7,6 @@ import java.util.regex.Pattern;
 
 import io.github.tezch.atomsql.annotation.NoSqlLog;
 import io.github.tezch.atomsql.annotation.Qualifier;
-import io.github.tezch.atomsql.annotation.SqlProxy;
 
 /**
  * Atom SQL用の設定をロードし、保持するクラスです。
@@ -59,12 +58,6 @@ public class PropertiesConfigure implements Configure {
 	private final int batchThreshold;
 
 	/**
-	 * uses-atom-cache<br>
-	 * {@link SqlProxy}のメソッド呼び出しで生成される{@link Atom}をキャッシュするかどうか
-	 */
-	private final boolean usesAtomCache;
-
-	/**
 	 * クラスパスのルートにあるatom-sql.propertiesから設定を読み込みインスタンスを作成します。
 	 */
 	public PropertiesConfigure() {
@@ -88,8 +81,6 @@ public class PropertiesConfigure implements Configure {
 		typeFactoryClass = config.getProperty("type-factory-class", null);
 
 		batchThreshold = Integer.parseInt(config.getProperty("batch-threshold", "0"));
-
-		usesAtomCache = Boolean.valueOf(config.getProperty("uses-atom-cache", "true"));
 	}
 
 	@Override
@@ -120,10 +111,5 @@ public class PropertiesConfigure implements Configure {
 	@Override
 	public int batchThreshold() {
 		return batchThreshold;
-	}
-
-	@Override
-	public boolean usesAtomCache() {
-		return usesAtomCache;
 	}
 }

@@ -14,7 +14,6 @@ import io.github.tezch.atomsql.annotation.Qualifier;
  * @param usesQualifier {@link Qualifier}を使用するかどうか
  * @param typeFactoryClass {@link AtomSqlTypeFactory}
  * @param batchThreshold バッチ更新時の閾値
- * @param usesAtomCache {@link Atom}をキャッシュするかどうか
  */
 public record SimpleConfigure(
 	boolean enableLog,
@@ -22,14 +21,13 @@ public record SimpleConfigure(
 	boolean shouldIgnoreNoSqlLog,
 	boolean usesQualifier,
 	String typeFactoryClass,
-	int batchThreshold,
-	boolean usesAtomCache) implements Configure {
+	int batchThreshold) implements Configure {
 
 	/**
 	 * スタブ設定
 	 * @return スタブ設定
 	 */
 	public static Configure stub() {
-		return new SimpleConfigure(false, null, false, false, null, 0, true);
+		return new SimpleConfigure(false, null, false, false, null, 0);
 	}
 }

@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -35,7 +34,6 @@ import io.github.tezch.atomsql.annotation.Sql;
 import io.github.tezch.atomsql.annotation.SqlFile;
 import io.github.tezch.atomsql.annotation.SqlProxy;
 import io.github.tezch.atomsql.annotation.processor.Methods;
-import io.github.tezch.atomsql.type.INTEGER;
 import io.github.tezch.atomsql.type.NULL;
 
 /**
@@ -309,17 +307,6 @@ public class AtomSql {
 		return instance;
 	}
 
-	/**
-	 * {@link Atom}キャッシュをクリアします。
-	 */
-	public void clearAtomCache() {
-		atomCache.clear();
-	}
-
-	private static record CacheValue(Atom<Object> atom, io.github.tezch.atomsql.annotation.processor.Method metadata) {}
-
-	private final Map<Method, CacheValue> atomCache = new ConcurrentHashMap<>();
-
 	private Object invokeMethod(Object proxy, Method method, Object[] args) throws Throwable {
 		if (method.isDefault()) return InvocationHandler.invokeDefault(proxy, method, args);
 
@@ -329,43 +316,6 @@ public class AtomSql {
 
 		if (returnType.isAnnotationPresent(SqlProxy.class)) return of(returnType);
 
-		CacheValue cached;
-		if (configure().usesAtomCache()) {
-			cached = atomCache.computeIfAbsent(method, key -> {
-				try {
-					return newCacheValue(proxy, method, args);
-				} catch (RuntimeException | Error e) {
-					//AtomSqlの例外の場合、RuntimeExceptionのサブクラスなのでそのまま素通し
-					throw e;
-				} catch (Exception e) {
-					throw new IllegalStateException(e);
-				}
-			});
-		} else {
-			cached = newCacheValue(proxy, method, args);
-		}
-
-		var atom = cached.atom;
-
-		if (returnType.equals(Atom.class)) {
-			return atom;
-		} else if (returnType.equals(Stream.class)) {
-			return atom.stream();
-		} else if (returnType.equals(List.class)) {
-			return atom.list();
-		} else if (returnType.equals(Optional.class)) {
-			return atom.get();
-		} else if (returnType.equals(int.class) || returnType.equals(void.class)) {
-			return atom.execute();
-		} else if (returnType.equals(Protoatom.class)) {
-			return new Protoatom<>(atom, cached.metadata.protoatomImplanter());
-		} else {
-			//不正な戻り値の型
-			throw new IllegalStateException("Incorrect return type: " + returnType);
-		}
-	}
-
-	private CacheValue newCacheValue(Object proxy, Method method, Object[] args) throws Exception {
 		var proxyInterface = proxy.getClass().getInterfaces()[0];
 
 		//メソッドに付与されたアノテーション > クラスに付与されたアノテーション
@@ -475,16 +425,7 @@ public class AtomSql {
 				}
 
 				var t = f.getType();
-				if (t.equals(Enum.class)) {
-					//型がEnumの場合、型パラメータに実際の型が記述されているが、この時点では取得できないので
-					//実際のオブジェクトから型を取得する
-					if (value == null) {
-						//値がnullの場合、仕方がないのでPreparedStatementにnullを設定できるようにENUMの実態のINTEGERを使用する
-						types.add(INTEGER.instance);
-					} else {
-						types.add(typeFactory.select(value.getClass()));
-					}
-				} else if (t.equals(Object.class)) {
+				if (t.equals(Object.class)) {
 					if (value == null) {
 						//値がnullの場合、仕方がないのでPreparedStatementにnullを設定できるようにNULLをセットする
 						types.add(NULL.instance);
@@ -525,7 +466,24 @@ public class AtomSql {
 				snapshot);
 		}
 
-		return new CacheValue(new Atom<Object>(AtomSql.this, helper, true), metadata);
+		var atom = new Atom<Object>(AtomSql.this, helper, true);
+
+		if (returnType.equals(Atom.class)) {
+			return atom;
+		} else if (returnType.equals(Stream.class)) {
+			return atom.stream();
+		} else if (returnType.equals(List.class)) {
+			return atom.list();
+		} else if (returnType.equals(Optional.class)) {
+			return atom.get();
+		} else if (returnType.equals(int.class) || returnType.equals(void.class)) {
+			return atom.execute();
+		} else if (returnType.equals(Protoatom.class)) {
+			return new Protoatom<>(atom, metadata.protoatomImplanter());
+		} else {
+			//不正な戻り値の型
+			throw new IllegalStateException("Incorrect return type: " + returnType);
+		}
 	}
 
 	/**
