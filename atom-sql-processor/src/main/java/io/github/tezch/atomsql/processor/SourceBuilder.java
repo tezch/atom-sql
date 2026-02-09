@@ -138,14 +138,14 @@ abstract class SourceBuilder {
 
 		var newClassName = packageName.isEmpty() ? generateClassName : packageName + "." + generateClassName;
 
-		if (alreadyCreatedFiles.contains(newClassName)) return;
-
 		var info = checker.get(newClassName);
 		if (info != null && (!info.enclosingClass.equals(className) || !info.method.equals(methodName))) {
 			//generateClassNameという名前は既に他で使われています
 			error("The name [" + generateClassName + "] has already been used elsewhere", method);
 			return;
 		}
+
+		if (alreadyCreatedFiles.contains(newClassName)) return;
 
 		checker.put(newClassName, new MethodInfo(newClassName, className, methodName));
 
