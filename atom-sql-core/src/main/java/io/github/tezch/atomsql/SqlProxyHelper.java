@@ -8,7 +8,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -44,7 +43,7 @@ class SqlProxyHelper implements PreparedStatementSetter {
 	SqlProxyHelper(
 		SecureString secureSql,
 		Endpoints.Entry entry,
-		String[] confidentials,
+		Set<String> confidentials,
 		String[] parameterNames,
 		AtomSqlType[] parameterTypes,
 		Class<?> resultClass,
@@ -67,8 +66,6 @@ class SqlProxyHelper implements PreparedStatementSetter {
 
 		List<Element> elements = new LinkedList<>();
 
-		var confidentialSet = confidentials(confidentials, parameterNames);
-
 		var sql = ColumnFinder.normalize(secureSql.toString());
 
 		var sqlRemain = PlaceholderFinder.execute(sql, f -> {
@@ -84,7 +81,7 @@ class SqlProxyHelper implements PreparedStatementSetter {
 			elements.add(
 				new Placeholder(
 					new SecureString(f.placeholder),
-					confidentialSet.contains(f.placeholder),
+					confidentials.contains(f.placeholder),
 					new SecureString(type.placeholderExpression(value)),
 					f.all,
 					type,
@@ -150,17 +147,6 @@ class SqlProxyHelper implements PreparedStatementSetter {
 		} catch (InvocationTargetException | IllegalAccessException | InstantiationException e) {
 			throw new IllegalStateException(e);
 		}
-	}
-
-	private static Set<String> confidentials(String[] confidentials, String[] parameterNames) {
-		if (confidentials == null) return Collections.emptySet();
-
-		//ConfidentialSqlが付与されているが、valueが指定されていない場合、すべて機密扱い
-		if (confidentials.length == 0) {
-			return new HashSet<>(Arrays.asList(parameterNames));
-		}
-
-		return new HashSet<>(Arrays.asList(confidentials));
 	}
 
 	private static Set<String> columnNamesFrom(ResultSet rs) {

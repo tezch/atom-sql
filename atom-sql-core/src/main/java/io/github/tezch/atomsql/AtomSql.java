@@ -16,6 +16,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import io.github.tezch.atomsql.annotation.Confidential;
 import io.github.tezch.atomsql.annotation.ConfidentialSql;
 import io.github.tezch.atomsql.annotation.NoSqlLog;
 import io.github.tezch.atomsql.annotation.NonThreadSafe;
@@ -338,8 +340,40 @@ public class AtomSql {
 
 		var parameterTypes = metadata.parameterTypes();
 
+		var parameterNames = metadata.parameters();
+
 		var confidentialSql = method.getAnnotation(ConfidentialSql.class);
-		var confidentials = confidentialSql == null ? null : confidentialSql.value();
+
+		Supplier<String[]> confidentialSqlValueSupplier = () -> {
+			var confidentialSqlValue = confidentialSql.value();
+
+			//ConfidentialSqlが付与されているが、valueが指定されていない場合、すべて機密扱い
+			return confidentialSqlValue.length == 0 ? parameterNames : confidentialSqlValue;
+		};
+
+		var confidentials = new HashSet<>(Arrays.asList(confidentialSql == null ? emptyStringArray : confidentialSqlValueSupplier.get()));
+
+		var parameterAnnotations = method.getParameterAnnotations();
+
+		var parameterBinderClass = metadata.parameterBinder();
+
+		var parameterBinderType = !parameterBinderClass.equals(Object.class);
+
+		for (int i = 0; i < parameterNames.length; i++) {
+			var name = parameterNames[i];
+			var annotations = parameterAnnotations[i];
+
+			Arrays.stream(annotations)
+				.filter(a -> a instanceof Confidential)
+				.findFirst()
+				.ifPresent(a -> {
+					if (parameterBinderType) {
+						Arrays.stream(parameterBinderClass.getFields()).map(f -> f.getName()).forEach(confidentials::add);
+					} else {
+						confidentials.add(name);
+					}
+				});
+		}
 
 		var sql = loadSql(proxyInterface, method);
 
@@ -406,7 +440,6 @@ public class AtomSql {
 		SqlProxyHelper helper;
 		var entry = nameAnnotation.map(a -> endpoints.get(a.value())).orElseGet(() -> endpoints.get());
 		if (parameterTypes.length == 1 && parameterTypes[0].equals(Consumer.class)) {
-			var parameterBinderClass = metadata.parameterBinder();
 			var parameterBinder = parameterBinderClass.getConstructor().newInstance();
 
 			Consumer.class.getMethod("accept", Object.class).invoke(args[0], new Object[] { parameterBinder });
@@ -457,7 +490,7 @@ public class AtomSql {
 				sql,
 				entry,
 				confidentials,
-				metadata.parameters(),
+				parameterNames,
 				types,
 				metadata.result(),
 				args,
