@@ -9,10 +9,13 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.StandardLocation;
 
@@ -134,7 +137,7 @@ abstract class SourceBuilder {
 		//パッケージはSqlProxyのあるパッケージ固定
 		var packageName = result.packageName;
 
-		var methodName = method.getSimpleName().toString();
+		var methodName = methodSignature(method);
 
 		var newClassName = packageName.isEmpty() ? generateClassName : packageName + "." + generateClassName;
 
@@ -158,6 +161,17 @@ abstract class SourceBuilder {
 		} catch (IOException ioe) {
 			error(ioe.getMessage(), method);
 		}
+	}
+
+	private static String methodSignature(ExecutableElement method) {
+		String parameters = method.getParameters()
+			.stream()
+			.map(VariableElement::asType)
+			.map(ProcessorUtils::toTypeElement)
+			.map(TypeElement::getQualifiedName)
+			.collect(Collectors.joining(", "));
+
+		return String.format("%s(%s)", method.getSimpleName().toString(), parameters);
 	}
 
 	void error(String message, Element e) {
