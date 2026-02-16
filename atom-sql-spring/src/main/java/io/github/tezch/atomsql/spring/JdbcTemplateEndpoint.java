@@ -31,7 +31,7 @@ public class JdbcTemplateEndpoint implements Endpoint {
 	/**
 	 * @param jdbcTemplate
 	 */
-	public JdbcTemplateEndpoint(JdbcTemplate jdbcTemplate) {
+	public JdbcTemplateEndpoint(@SuppressWarnings("exports") JdbcTemplate jdbcTemplate) {
 		this.jdbcTemplate = Objects.requireNonNull(jdbcTemplate);
 	}
 

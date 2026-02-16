@@ -8,9 +8,9 @@ module io.github.tezch.atomsql.spring {
 
 	requires spring.beans;
 
-	requires transitive spring.context;
+	requires spring.context;
 
-	requires transitive spring.jdbc;
+	requires spring.jdbc;
 
 	requires spring.core;
 

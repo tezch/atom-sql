@@ -43,12 +43,12 @@ public class AtomSqlContextInitializer implements ApplicationContextInitializer<
 	 * {@link JdbcTemplate}を利用する{@link Endpoint}を独自に生成するする際に使用するコンストラクタです。
 	 * @param endpointBuilder
 	 */
-	public AtomSqlContextInitializer(Function<JdbcTemplate, Endpoint> endpointBuilder) {
+	public AtomSqlContextInitializer(@SuppressWarnings("exports") Function<JdbcTemplate, Endpoint> endpointBuilder) {
 		this.endpointBuilder = Objects.requireNonNull(endpointBuilder);
 	}
 
 	@Override
-	public void initialize(GenericApplicationContext context) {
+	public void initialize(@SuppressWarnings("exports") GenericApplicationContext context) {
 		AtomSql.initializeIfUninitialized(configure(context));
 
 		List<Class<?>> classes;
