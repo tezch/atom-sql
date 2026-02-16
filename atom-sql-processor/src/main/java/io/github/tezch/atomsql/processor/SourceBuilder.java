@@ -14,8 +14,8 @@ import java.util.stream.Collectors;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.StandardLocation;
 
@@ -167,11 +167,17 @@ abstract class SourceBuilder {
 		String parameters = method.getParameters()
 			.stream()
 			.map(VariableElement::asType)
-			.map(ProcessorUtils::toTypeElement)
-			.map(TypeElement::getQualifiedName)
+			.map(SourceBuilder::toString)
 			.collect(Collectors.joining(", "));
 
 		return String.format("%s(%s)", method.getSimpleName().toString(), parameters);
+	}
+
+	private static String toString(TypeMirror type) {
+		// プリミティブ型はElementに変換できないため直接文字列化
+		if (type.getKind().isPrimitive()) return type.toString();
+
+		return ProcessorUtils.toTypeElement(type).getQualifiedName().toString();
 	}
 
 	void error(String message, Element e) {
