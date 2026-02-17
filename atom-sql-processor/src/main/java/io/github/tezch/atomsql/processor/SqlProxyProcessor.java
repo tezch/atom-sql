@@ -140,10 +140,14 @@ class SqlProxyProcessor {
 			throw new ProcessException();
 		}
 
+		var binaryClassName = ProcessorUtils.getBinaryClassName(e, processingEnv.get());
+
+		duplicateClassChecker.startSqlProxy(binaryClassName);
+
 		metadataBuilder.build(e);
 
 		if (!metadataBuilder.hasError())
-			sqlProxyList.add(processingEnv.get().getElementUtils().getBinaryName(ProcessorUtils.toTypeElement(e)).toString());
+			sqlProxyList.add(binaryClassName);
 	}
 
 	private void error(String message, Element e) {

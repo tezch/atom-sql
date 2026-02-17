@@ -96,6 +96,10 @@ class ProcessorUtils {
 			env.getElementUtils().getBinaryName(clazz).toString());
 	}
 
+	static String getBinaryClassName(Element clazz, ProcessingEnvironment env) {
+		return env.getElementUtils().getBinaryName(ProcessorUtils.toTypeElement(clazz)).toString();
+	}
+
 	/**
 	 * 内部使用
 	 * @param e

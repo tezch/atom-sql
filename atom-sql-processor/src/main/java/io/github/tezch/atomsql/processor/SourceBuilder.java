@@ -21,6 +21,7 @@ import javax.tools.StandardLocation;
 
 import io.github.tezch.atomsql.AtomSqlUtils;
 import io.github.tezch.atomsql.Constants;
+import io.github.tezch.atomsql.annotation.SqlProxy;
 import io.github.tezch.atomsql.processor.MethodExtractor.Result;
 import io.github.tezch.atomsql.processor.MethodExtractor.SqlNotFoundException;
 import io.github.tezch.atomsql.processor.SqlFileResolver.SqlFileNotFoundException;
@@ -54,7 +55,6 @@ abstract class SourceBuilder {
 		private static final String fileName = "io.github.tezch.atom-sql.helper-list";
 
 		//生成クラス名, メソッド名
-		//メソッドのパラメータの型はConsumer<Helper>固定なので識別にはメソッド名だけでOK
 		private final Map<String, MethodInfo> allHelperNames = new HashMap<>();
 
 		void start(ProcessingEnvironment env) {
@@ -86,6 +86,13 @@ abstract class SourceBuilder {
 			}
 		}
 
+		/**
+		 * これから処理する{@link SqlProxy}分は削除しておき、新たに全生成クラスを検査可能にする
+		 */
+		void startSqlProxy(String binaryClassName) {
+			allHelperNames.entrySet().removeIf(e -> e.getValue().enclosingClass.equals(binaryClassName));
+		}
+
 		private void put(String className, MethodInfo info) {
 			allHelperNames.put(className, info);
 		}
@@ -112,14 +119,14 @@ abstract class SourceBuilder {
 
 	abstract String source(String generateClassName, ExecutableElement method, Result result);
 
-	void execute(ExecutableElement method, Element targetType) {
+	private void execute(ExecutableElement method, Element targetType) {
 		String generatePackageName;
 		String generateClassName;
 		{
-			var clazz = ProcessorUtils.toTypeElement(targetType);
-			var className = clazz.getQualifiedName().toString();
+			var typeElement = ProcessorUtils.toTypeElement(targetType);
+			var className = typeElement.getQualifiedName().toString();
 
-			generatePackageName = ProcessorUtils.getPackageName(clazz);
+			generatePackageName = ProcessorUtils.getPackageName(typeElement);
 
 			generateClassName = AtomSqlUtils.extractSimpleClassName(className, generatePackageName);
 		}
@@ -137,20 +144,20 @@ abstract class SourceBuilder {
 		//パッケージはSqlProxyのあるパッケージ固定
 		var packageName = result.packageName;
 
-		var methodName = methodSignature(method);
+		var methodSignature = methodSignature(method);
 
 		var newClassName = packageName.isEmpty() ? generateClassName : packageName + "." + generateClassName;
 
 		var info = checker.get(newClassName);
-		if (info != null && (!info.enclosingClass.equals(className) || !info.method.equals(methodName))) {
+		if (info != null && (!info.enclosingClass.equals(className) || !info.method.equals(methodSignature))) {
 			//generateClassNameという名前は既に他で使われています
 			error("The name [" + generateClassName + "] has already been used elsewhere", method);
 			return;
 		}
 
-		if (alreadyCreatedFiles.contains(newClassName)) return;
+		checker.put(newClassName, new MethodInfo(newClassName, className, methodSignature));
 
-		checker.put(newClassName, new MethodInfo(newClassName, className, methodName));
+		if (alreadyCreatedFiles.contains(newClassName)) return;
 
 		try {
 			try (var output = new BufferedOutputStream(processingEnv.get().getFiler().createSourceFile(newClassName, method).openOutputStream())) {
