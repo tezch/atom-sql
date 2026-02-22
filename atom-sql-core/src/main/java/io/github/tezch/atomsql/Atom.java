@@ -144,7 +144,7 @@ public class Atom<T> {
 	Atom(AtomSql atomsql, SqlProxyHelper helper, boolean andType) {
 		this.atomSql = atomsql;
 
-		if (helper.sql.containsNonThreadSafeValue()) {
+		if (helper.containsNonThreadSafeValue()) {
 			atomSql.registerHelperForNonThreadSafe(nonThreadSafeHelperKey, helper);
 			this.helperSupplier = () -> atomSql.getHelperForNonThreadSafe(nonThreadSafeHelperKey);
 		} else {

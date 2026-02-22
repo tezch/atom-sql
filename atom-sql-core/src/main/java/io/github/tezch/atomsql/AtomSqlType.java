@@ -231,11 +231,9 @@ public interface AtomSqlType {
 	/**
 	 * この型がスレッドセーフではないかを返します。<br>
 	 * {@link CSV}等、実際の値を用いて判断するタイプのために実際に使用される値が提供されます。
-	 * @param value 実際に使用される値
-	 * @param factory 値の判定に使用する{@link AtomSqlTypeFactory}
 	 * @return nonThreadSafeの場合、true
 	 */
-	default boolean nonThreadSafe(Object value, AtomSqlTypeFactory factory) {
+	default boolean nonThreadSafe() {
 		return getClass().getAnnotation(NonThreadSafe.class) != null;
 	}
 
@@ -263,5 +261,13 @@ public interface AtomSqlType {
 	 */
 	default String typeArgumentExpression() {
 		return type().getName();
+	}
+
+	/**
+	 * この型が型パラメータを必要とするかを返します。
+	 * @return この型が型パラメータを必要とするか
+	 */
+	default boolean needsTypeArgument() {
+		return false;
 	}
 }

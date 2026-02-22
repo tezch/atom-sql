@@ -22,8 +22,6 @@ class InnerSql {
 
 		void placeholder(Consumer<Placeholder> consumer);
 
-		boolean hasNonThreadSafeValue();
-
 		void appendTo(StringBuilder builder);
 
 		void appendOriginalTo(StringBuilder builder);
@@ -52,11 +50,6 @@ class InnerSql {
 			}
 
 			elements.add(new Text(new SecureString(remain)));
-		}
-
-		@Override
-		public boolean hasNonThreadSafeValue() {
-			return false;
 		}
 
 		@Override
@@ -89,18 +82,12 @@ class InnerSql {
 		SecureString expression, //置換後のプレースホルダ
 		String original, //元のプレースホルダ文字列全体（型ヒントを含む）
 		AtomSqlType type, //型
-		Object value, //値
-		AtomSqlTypeFactory typeFactory//nonThreadSafe判定用
+		Object value //値
 	) implements Element {
 
 		@Override
 		public void put(Pattern pattern, InnerSql another, List<Element> elements) {
 			elements.add(this);
-		}
-
-		@Override
-		public boolean hasNonThreadSafeValue() {
-			return type.nonThreadSafe(value, typeFactory);
 		}
 
 		@Override
@@ -206,10 +193,6 @@ class InnerSql {
 		}
 
 		return true;
-	}
-
-	boolean containsNonThreadSafeValue() {
-		return elements.stream().filter(e -> e.hasNonThreadSafeValue()).findFirst().isPresent();
 	}
 
 	@Override

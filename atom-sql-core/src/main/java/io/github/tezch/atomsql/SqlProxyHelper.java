@@ -40,6 +40,8 @@ class SqlProxyHelper implements PreparedStatementSetter {
 
 	private final SqlProxySnapshot snapshot;
 
+	private final boolean containsNonThreadSafeValue;
+
 	SqlProxyHelper(
 		SecureString secureSql,
 		Endpoints.Entry entry,
@@ -50,12 +52,14 @@ class SqlProxyHelper implements PreparedStatementSetter {
 		Object[] args,
 		AtomSqlTypeFactory typeFactory,
 		SqlLogger sqlLogger,
-		SqlProxySnapshot snapshot) {
+		SqlProxySnapshot snapshot,
+		boolean containsNonThreadSafeValue) {
 		this.entry = entry;
 		this.resultClass = resultClass;
 		this.typeFactory = typeFactory;
 		this.sqlLogger = sqlLogger;
 		this.snapshot = snapshot;
+		this.containsNonThreadSafeValue = containsNonThreadSafeValue;
 
 		Map<String, TypeAndArg> map = new HashMap<>();
 		for (int i = 0; i < parameterNames.length; i++) {
@@ -85,8 +89,7 @@ class SqlProxyHelper implements PreparedStatementSetter {
 					new SecureString(type.placeholderExpression(value)),
 					f.all,
 					type,
-					value,
-					typeFactory));
+					value));
 		});
 
 		elements.add(new Text(new SecureString(sqlRemain)));
@@ -101,6 +104,7 @@ class SqlProxyHelper implements PreparedStatementSetter {
 		this.typeFactory = base.typeFactory;
 		this.sqlLogger = base.sqlLogger;
 		this.snapshot = base.snapshot;
+		this.containsNonThreadSafeValue = base.containsNonThreadSafeValue;
 	}
 
 	SqlProxyHelper(
@@ -112,10 +116,15 @@ class SqlProxyHelper implements PreparedStatementSetter {
 		this.typeFactory = main.typeFactory;
 		this.sqlLogger = main.sqlLogger;
 		this.snapshot = main.snapshot;
+		this.containsNonThreadSafeValue = main.containsNonThreadSafeValue;
 	}
 
 	SqlProxySnapshot sqlProxySnapshot() {
 		return snapshot;
+	}
+
+	boolean containsNonThreadSafeValue() {
+		return containsNonThreadSafeValue;
 	}
 
 	Object createDataObject(ResultSet rs) {

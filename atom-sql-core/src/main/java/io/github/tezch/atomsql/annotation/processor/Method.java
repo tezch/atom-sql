@@ -4,6 +4,7 @@ import java.util.function.Consumer;
 
 import io.github.tezch.atomsql.Protoatom;
 import io.github.tezch.atomsql.annotation.DataObject;
+import io.github.tezch.atomsql.annotation.NonThreadSafe;
 import io.github.tezch.atomsql.annotation.OptionalColumn;
 
 /**
@@ -52,4 +53,10 @@ public @interface Method {
 	 * @return {@link Protoatom} に指定されたクラス
 	 */
 	Class<?> protoatomImplanter() default Object.class;
+
+	/**
+	 * このメソッドのパラメータの型の中に(自動生成パラメータクラスのフィールドを含む){@link NonThreadSafe}の付与された型があるか
+	 * @return {@link NonThreadSafe}に該当する型があればtrue
+	 */
+	boolean nonThreadSafe();
 }

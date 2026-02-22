@@ -125,6 +125,7 @@ class DataObjectBuilder extends SourceBuilder {
 
 		columns(result.sql, columns, enumValidators, method);
 
+		//自動生成DataObjectでレコードのフィールド数限界を超えないようにする
 		if (columns.size() > 100) {
 			return tooManyColumnsDataObject(generateClassName, result, columns, enumValidators);
 		}

@@ -482,7 +482,8 @@ public class AtomSql {
 				values.toArray(Object[]::new),
 				typeFactory,
 				mySqlLogger,
-				snapshot);
+				snapshot,
+				metadata.nonThreadSafe());
 		} else {
 			var types = Arrays.stream(metadata.parameterTypes()).map(c -> typeFactory.select(c)).toArray(AtomSqlType[]::new);
 
@@ -496,7 +497,8 @@ public class AtomSql {
 				args,
 				typeFactory,
 				mySqlLogger,
-				snapshot);
+				snapshot,
+				metadata.nonThreadSafe());
 		}
 
 		var atom = new Atom<Object>(AtomSql.this, helper, true);
@@ -756,7 +758,8 @@ public class AtomSql {
 				public <T extends Annotation> T getClassAnnotation(Class<T> annotationClass) {
 					throw new UnsupportedOperationException();
 				}
-			});
+			},
+			false);
 	}
 
 	static void logElapsed(SqlLogger sqlLogger, long startNanos) {

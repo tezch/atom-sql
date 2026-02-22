@@ -39,6 +39,7 @@ import io.github.tezch.atomsql.AtomSqlUtils;
 import io.github.tezch.atomsql.ColumnFinder;
 import io.github.tezch.atomsql.ColumnFinder.Found;
 import io.github.tezch.atomsql.Constants;
+import io.github.tezch.atomsql.Csv;
 import io.github.tezch.atomsql.PlaceholderFinder;
 import io.github.tezch.atomsql.Protoatom;
 import io.github.tezch.atomsql.annotation.DataObject;
@@ -49,7 +50,6 @@ import io.github.tezch.atomsql.processor.MethodExtractor.Result;
 import io.github.tezch.atomsql.processor.MethodExtractor.SqlNotFoundException;
 import io.github.tezch.atomsql.processor.SourceBuilder.DuplicateClassChecker;
 import io.github.tezch.atomsql.processor.SqlFileResolver.SqlFileNotFoundException;
-import io.github.tezch.atomsql.type.CSV;
 
 /**
  * @author tezch
@@ -331,7 +331,9 @@ class SqlProxyProcessor {
 		}
 	}
 
-	private class ParameterTypeChecker extends SimpleTypeVisitor14<TypeMirror, VariableElement> {
+	private static record ParameterTypeCheckResult(Optional<TypeMirror> consumerTypeArg, boolean nonThreadSafe) {}
+
+	private class ParameterTypeChecker extends SimpleTypeVisitor14<ParameterTypeCheckResult, VariableElement> {
 
 		private final ExecutableElement method;
 
@@ -340,7 +342,7 @@ class SqlProxyProcessor {
 		}
 
 		@Override
-		protected TypeMirror defaultAction(TypeMirror e, VariableElement p) {
+		protected ParameterTypeCheckResult defaultAction(TypeMirror e, VariableElement p) {
 			//パラメータタイプeは使用できません
 			error("Parameter type [" + e + "] cannot be used", p);
 			metadataBuilder.setError();
@@ -348,7 +350,7 @@ class SqlProxyProcessor {
 		}
 
 		@Override
-		public TypeMirror visitPrimitive(PrimitiveType t, VariableElement p) {
+		public ParameterTypeCheckResult visitPrimitive(PrimitiveType t, VariableElement p) {
 			return switch (t.getKind()) {
 			case BOOLEAN, BYTE, DOUBLE, FLOAT, INT, LONG -> DEFAULT_VALUE;
 			default -> defaultAction(t, p);
@@ -356,28 +358,38 @@ class SqlProxyProcessor {
 		}
 
 		@Override
-		public TypeMirror visitArray(ArrayType t, VariableElement p) {
-			if (t.getComponentType().getKind() == TypeKind.BYTE) return DEFAULT_VALUE;
+		public ParameterTypeCheckResult visitArray(ArrayType t, VariableElement p) {
+			if (t.getComponentType().getKind() == TypeKind.BYTE)
+				return new ParameterTypeCheckResult(Optional.empty(), true);
 
 			return defaultAction(t, p);
 		}
 
 		@Override
-		public TypeMirror visitDeclared(DeclaredType t, VariableElement p) {
+		public ParameterTypeCheckResult visitDeclared(DeclaredType t, VariableElement p) {
 			TypeElement type = ProcessorUtils.toTypeElement(t.asElement());
 
 			if (ProcessorUtils.sameClass(type, Consumer.class)) {
-				parameterBinderBuilder.execute(method);
-				return processConsumerType(p);
+				return processConsumerResult(p, parameterBinderBuilder.executeAndGetNonThreadSafe(method));
 			}
 
-			if (ProcessorUtils.canUse(type)) return DEFAULT_VALUE;
+			// CsvはcanUse対象外で次へ
+			if (ProcessorUtils.canUse(type))
+				return new ParameterTypeCheckResult(Optional.empty(), ProcessorUtils.nonThreadSafe(type));
 
-			var csvType = new CSV(ProcessorTypeFactory.instance.atomSqlTypeFactory).type();
-			if (ProcessorUtils.sameClass(type, csvType)) {
-				var argumentType = ProcessorUtils.toTypeElement(ProcessorUtils.toElement(t.getTypeArguments().get(0)));
+			if (ProcessorUtils.sameClass(type, Csv.class)) {
+				var args = t.getTypeArguments();
+				if (args.size() == 0) {
+					error(Csv.class.getSimpleName() + " requires a type argument", p);
+					metadataBuilder.setError();
+					return DEFAULT_VALUE;
+				}
 
-				if (ProcessorUtils.canUse(argumentType)) return DEFAULT_VALUE;
+				var argumentType = ProcessorUtils.toTypeElement(ProcessorUtils.toElement(args.get(0)));
+
+				if (!ProcessorUtils.canUse(argumentType)) return defaultAction(t, p);
+
+				return new ParameterTypeCheckResult(Optional.empty(), ProcessorUtils.nonThreadSafe(argumentType));
 			}
 
 			return defaultAction(t, p);
@@ -385,26 +397,25 @@ class SqlProxyProcessor {
 
 		//自動生成クラスがまだ作成されていない場合
 		@Override
-		public TypeMirror visitError(ErrorType t, VariableElement p) {
+		public ParameterTypeCheckResult visitError(ErrorType t, VariableElement p) {
 			var type = ProcessorUtils.toTypeElement(t.asElement());
 
 			if (ProcessorUtils.sameClass(type, Consumer.class)) {
-				parameterBinderBuilder.execute(method);
-				return processConsumerType(p);
+				return processConsumerResult(p, parameterBinderBuilder.executeAndGetNonThreadSafe(method));
 			}
 
 			return defaultAction(t, p);
 		}
 
-		private TypeMirror processConsumerType(VariableElement p) {
+		private ParameterTypeCheckResult processConsumerResult(VariableElement p, boolean nonThreadSafe) {
 			var args = ProcessorUtils.getTypeArgument(p);
 			if (args.size() == 0) {
-				error("Consumer requires a type argument", p);
+				error(Consumer.class.getSimpleName() + " requires a type argument", p);
 				metadataBuilder.setError();
 				return DEFAULT_VALUE;
 			}
 
-			return args.get(0);
+			return new ParameterTypeCheckResult(Optional.of(args.get(0)), nonThreadSafe);
 		}
 	}
 
@@ -439,9 +450,14 @@ class SqlProxyProcessor {
 
 				info.parameterTypes.add(parameter.asType().accept(typeNameExtractor, e));
 
-				var typeArg = parameter.asType().accept(checker, parameter);
-				if (typeArg != null) {
-					info.parameterBinder = typeArg.accept(typeNameExtractor, e);
+				var result = parameter.asType().accept(checker, parameter);
+				if (result != null) {
+					result.consumerTypeArg.ifPresent(t -> {
+						info.parameterBinder = t.accept(typeNameExtractor, e);
+					});
+
+					// 一つでもnonThreadSafeの型があればこのメソッドはnonThreadSafe扱い
+					info.nonThreadSafe = info.nonThreadSafe || result.nonThreadSafe;
 				}
 			});
 

@@ -3,6 +3,7 @@ package io.github.tezch.atomsql.processor;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -71,6 +72,9 @@ class ParameterBinderBuilder extends HelperBuilder {
 		var dubplicateChecker = new HashSet<String>();
 		var fields = new LinkedList<String>();
 		var enumValidators = new LinkedList<String>();
+
+		boolean[] nonThreadSafe = { false };
+
 		PlaceholderFinder.execute(sql, f -> {
 			//重複は除外
 			if (dubplicateChecker.contains(f.placeholder)) return;
@@ -79,20 +83,27 @@ class ParameterBinderBuilder extends HelperBuilder {
 
 			var typeFactory = ProcessorTypeFactory.instance;
 
-			var typeArgument = f.typeArgumentHint
-				.map(typeFactory::typeArgumentOf)
+			var type = f.typeHint.map(typeFactory::typeOf).orElse(OBJECT.instance);
+
+			var argumentType = f.typeArgumentHint.map(typeFactory::typeArgumentOf);
+			// 型パラメータが必要なのにヒントがない場合
+			if (type.needsTypeArgument() && argumentType.isEmpty()) {
+				argumentType = Optional.of(OBJECT.instance);
+			}
+
+			var typeArgument = argumentType
 				.map(t -> "<" + t.typeArgumentExpression() + ">")
 				.orElse("");
 
-			var type = f.typeHint.map(typeFactory::typeOf).orElse(OBJECT.instance);
-
 			ProcessorUtils.enumValidator(type, f.placeholder).ifPresent(enumValidators::add);
 
-			ProcessorUtils.enumValidator(
-				f.typeArgumentHint
-					.map(typeFactory::typeOf)
-					.orElse(OBJECT.instance),
-				f.placeholder).ifPresent(enumValidators::add);
+			nonThreadSafe[0] = nonThreadSafe[0] || type.nonThreadSafe();
+
+			argumentType.ifPresent(t -> {
+				nonThreadSafe[0] = nonThreadSafe[0] || t.nonThreadSafe();
+
+				ProcessorUtils.enumValidator(t, f.placeholder).ifPresent(enumValidators::add);
+			});
 
 			var field = "public "
 				+ type.typeExpression()
@@ -103,9 +114,23 @@ class ParameterBinderBuilder extends HelperBuilder {
 			fields.add(field);
 		});
 
+		this.nonThreadSafe.set(nonThreadSafe[0]);
+
 		param.put("FIELDS", String.join(Constants.NEW_LINE, fields));
 
 		param.put("ENUM_VALIDATORS", String.join(Constants.NEW_LINE, enumValidators));
+	}
+
+	private ThreadLocal<Boolean> nonThreadSafe = ThreadLocal.withInitial(() -> false);
+
+	boolean executeAndGetNonThreadSafe(ExecutableElement method) {
+		try {
+			execute(method);
+
+			return nonThreadSafe.get();
+		} finally {
+			nonThreadSafe.remove();
+		}
 	}
 
 	private static TypeElement toTypeElement(VariableElement e) {

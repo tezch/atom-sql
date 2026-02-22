@@ -141,6 +141,8 @@ class MetadataBuilder {
 		if (info.protoatomImplanter != null)
 			methodContents.add("protoatomImplanter = " + info.protoatomImplanter + ".class");
 
+		methodContents.add("nonThreadSafe = " + info.nonThreadSafe);
+
 		return "@Method(" + String.join(", ", methodContents) + ")";
 	}
 
@@ -167,5 +169,7 @@ class MetadataBuilder {
 		String dataType;
 
 		String protoatomImplanter;
+
+		boolean nonThreadSafe;
 	}
 }

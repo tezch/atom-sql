@@ -53,9 +53,6 @@ public class Csv<T> {
 		//値は空であってはなりません
 		if (values.size() == 0) throw new IllegalArgumentException("Values must not be empty");
 
-		//値にnullが含まれています
-		if (values.stream().filter(v -> v == null).findFirst().isPresent()) throw new NullPointerException("Values contains null");
-
 		this.values = Collections.unmodifiableList(values);
 	}
 

@@ -178,6 +178,23 @@ class ProcessorUtils {
 			.isPresent();
 	}
 
+	/**
+	 * @see AtomSqlType#nonThreadSafe()
+	 * @param type
+	 * @return boolean
+	 */
+	static boolean nonThreadSafe(TypeElement type) {
+		if (type.getKind() == ElementKind.ENUM) return false;
+
+		var typeName = type.getQualifiedName().toString();
+
+		return Arrays.stream(ProcessorTypeFactory.instance.atomSqlTypeFactory.nonPrimitiveTypes())
+			.filter(t -> typeName.equals(t.type().getCanonicalName()))
+			.findFirst()
+			.map(t -> t.nonThreadSafe())
+			.orElseThrow();
+	}
+
 	static Optional<String> enumValidator(AtomSqlType type, String symbol) {
 		if (type instanceof ENUM_EXPRESSION_TYPE) {
 			//enumClassとしてなんでも記述できないように、Enumの型パラメータとして表現することで
