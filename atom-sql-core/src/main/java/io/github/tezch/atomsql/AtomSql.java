@@ -27,6 +27,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import io.github.tezch.atomsql.SqlComposite.SqlCompositeHelper;
 import io.github.tezch.atomsql.annotation.Confidential;
 import io.github.tezch.atomsql.annotation.ConfidentialSql;
 import io.github.tezch.atomsql.annotation.NoSqlLog;
@@ -95,7 +96,7 @@ public class AtomSql {
 
 	private final SqlLogger sqlLogger;
 
-	private static final ThreadLocal<Map<Object, SqlProxyHelper>> nonThreadSafeHelpers = new ThreadLocal<>();
+	private static final ThreadLocal<Map<Object, SqlComposite>> nonThreadSafeSqls = new ThreadLocal<>();
 
 	private final ThreadLocal<BatchResources> batchResources = new ThreadLocal<>();
 
@@ -106,7 +107,7 @@ public class AtomSql {
 	class BatchResources {
 
 		private static record Resource(
-			SqlProxyHelper helper,
+			Atom<?> atom,
 			Consumer<Integer> resultConsumer,
 			Optional<StackTraceElement[]> stackTrace) {}
 
@@ -121,14 +122,14 @@ public class AtomSql {
 			this.threshold = threshold > 0 ? threshold : Integer.MAX_VALUE;
 		}
 
-		void put(String name, SqlProxyHelper helper, Consumer<Integer> resultConsumer, Optional<StackTraceElement[]> stackTrace) {
+		void put(String name, Atom<?> atom, Consumer<Integer> resultConsumer, Optional<StackTraceElement[]> stackTrace) {
 			if (num == threshold) flushAll();
 
 			allResources.computeIfAbsent(name, n -> new HashMap<>())
 				.computeIfAbsent(
-					helper.sql.string(),
+					atom.sqlComposite().compiled().sqlString(),
 					s -> new ArrayList<>())
-				.add(new Resource(helper, resultConsumer, stackTrace));
+				.add(new Resource(atom, resultConsumer, stackTrace));
 			num++;
 		}
 
@@ -154,12 +155,12 @@ public class AtomSql {
 					@Override
 					public void setValues(PreparedStatement ps, int i) throws SQLException {
 						var resource = resources.get(i);
-						resource.helper.setValues(ps, resource.stackTrace);
+						resource.atom.preparedStatementSetter().setValues(ps, resource.stackTrace);
 					}
 
 					@Override
 					public SqlProxySnapshot sqlProxySnapshot(int i) {
-						return resources.get(i).helper.sqlProxySnapshot();
+						return resources.get(i).atom.helper().snapshot();
 					}
 
 					@Override
@@ -437,8 +438,15 @@ public class AtomSql {
 			}
 		};
 
-		SqlProxyHelper helper;
-		var entry = nameAnnotation.map(a -> endpoints.get(a.value())).orElseGet(() -> endpoints.get());
+		//TODO cache helper
+		SqlProxyHelper helper = new SqlProxyHelper(
+			nameAnnotation.map(a -> endpoints.get(a.value())).orElseGet(() -> endpoints.get()),
+			metadata.result(),
+			typeFactory,
+			mySqlLogger,
+			snapshot);
+
+		SqlComposite sqlComposite;
 		if (parameterTypes.length == 1 && parameterTypes[0].equals(Consumer.class)) {
 			var parameterBinder = parameterBinderClass.getConstructor().newInstance();
 
@@ -472,36 +480,33 @@ public class AtomSql {
 				values.add(value);
 			});
 
-			helper = new SqlProxyHelper(
+			//TODO cache
+			var sqlCompositeHelper = new SqlCompositeHelper(
 				sql,
-				entry,
 				confidentials,
 				names.toArray(String[]::new),
 				types.toArray(AtomSqlType[]::new),
-				metadata.result(),
-				values.toArray(Object[]::new),
-				typeFactory,
-				mySqlLogger,
-				snapshot,
 				metadata.nonThreadSafe());
+
+			sqlComposite = SqlComposite.createSqlComposite(sqlCompositeHelper, values.toArray(Object[]::new));
 		} else {
 			var types = Arrays.stream(metadata.parameterTypes()).map(c -> typeFactory.select(c)).toArray(AtomSqlType[]::new);
 
-			helper = new SqlProxyHelper(
+			var sqlCompositeHelper = new SqlCompositeHelper(
 				sql,
-				entry,
 				confidentials,
 				parameterNames,
 				types,
-				metadata.result(),
-				args,
-				typeFactory,
-				mySqlLogger,
-				snapshot,
 				metadata.nonThreadSafe());
+
+			sqlComposite = SqlComposite.createSqlComposite(sqlCompositeHelper, args);
 		}
 
-		var atom = new Atom<Object>(AtomSql.this, helper, true);
+		var atom = new Atom<Object>(
+			AtomSql.this,
+			helper,
+			sqlComposite,
+			true);
 
 		if (returnType.equals(Atom.class)) {
 			return atom;
@@ -635,17 +640,17 @@ public class AtomSql {
 	 */
 	public void tryNonThreadSafe(Runnable runnable) {
 		//既にtryNonThreadSafeの中で呼ばれた場合
-		if (nonThreadSafeHelpers.get() != null) {
+		if (nonThreadSafeSqls.get() != null) {
 			runnable.run();
 
 			return;
 		}
 
-		nonThreadSafeHelpers.set(new HashMap<>());
+		nonThreadSafeSqls.set(new HashMap<>());
 		try {
 			runnable.run();
 		} finally {
-			nonThreadSafeHelpers.remove();
+			nonThreadSafeSqls.remove();
 		}
 	}
 
@@ -662,31 +667,31 @@ public class AtomSql {
 	 */
 	public <T> T tryNonThreadSafe(Supplier<T> supplier) {
 		//既にtryNonThreadSafeの中で呼ばれた場合
-		if (nonThreadSafeHelpers.get() != null) {
+		if (nonThreadSafeSqls.get() != null) {
 			return supplier.get();
 		}
 
-		nonThreadSafeHelpers.set(new HashMap<>());
+		nonThreadSafeSqls.set(new HashMap<>());
 		try {
 			return supplier.get();
 		} finally {
-			nonThreadSafeHelpers.remove();
+			nonThreadSafeSqls.remove();
 		}
 	}
 
-	void registerHelperForNonThreadSafe(Object key, SqlProxyHelper helper) {
-		helperMap().put(key, helper);
+	void registerSqlCompositeForNonThreadSafe(Object key, SqlComposite sql) {
+		sqlMap().put(key, sql);
 	}
 
-	SqlProxyHelper getHelperForNonThreadSafe(Object key) {
-		var result = helperMap().get(key);
+	SqlComposite getHelperForNonThreadSafe(Object key) {
+		var result = sqlMap().get(key);
 		if (result == null) throw new NonThreadSafeException();
 
 		return result;
 	}
 
-	private Map<Object, SqlProxyHelper> helperMap() {
-		var map = nonThreadSafeHelpers.get();
+	private Map<Object, SqlComposite> sqlMap() {
+		var map = nonThreadSafeSqls.get();
 		if (map == null) throw new NonThreadSafeException();
 
 		return map;
@@ -721,15 +726,10 @@ public class AtomSql {
 
 	private static final Object[] emptyObjectArray = {};
 
-	SqlProxyHelper helper(SecureString sql) {
+	SqlProxyHelper helper() {
 		return new SqlProxyHelper(
-			sql,
 			endpoints.get(),
-			null,
-			emptyStringArray,
-			emptyAtomSqlTypeArray,
 			Object.class,
-			emptyObjectArray,
 			typeFactory,
 			sqlLogger,
 			new SqlProxySnapshot() {
@@ -758,8 +758,30 @@ public class AtomSql {
 				public <T extends Annotation> T getClassAnnotation(Class<T> annotationClass) {
 					throw new UnsupportedOperationException();
 				}
-			},
-			false);
+			});
+	}
+
+	SqlComposite sqlComposite(SecureString sql) {
+		return SqlComposite.createSqlComposite(
+			new SqlCompositeHelper(
+				sql,
+				null,
+				emptyStringArray,
+				emptyAtomSqlTypeArray,
+				false),
+			emptyObjectArray);
+	}
+
+	static record SqlProxyHelper(
+		Endpoints.Entry entry,
+		Class<?> resultClass,
+		AtomSqlTypeFactory typeFactory,
+		SqlLogger sqlLogger,
+		SqlProxySnapshot snapshot) {
+
+		static SqlProxyHelper newHelper(SqlProxyHelper base, Class<?> resultClass) {
+			return new SqlProxyHelper(base.entry, resultClass, base.typeFactory, base.sqlLogger, base.snapshot);
+		}
 	}
 
 	static void logElapsed(SqlLogger sqlLogger, long startNanos) {

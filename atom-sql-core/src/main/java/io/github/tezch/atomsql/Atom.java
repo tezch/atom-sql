@@ -1,21 +1,37 @@
 package io.github.tezch.atomsql;
 
+import java.lang.System.Logger.Level;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Modifier;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import io.github.tezch.atomsql.AtomSql.SqlProxyHelper;
+import io.github.tezch.atomsql.Endpoint.BindingValue;
 import io.github.tezch.atomsql.annotation.DataObject;
+import io.github.tezch.atomsql.annotation.OptionalColumn;
 import io.github.tezch.atomsql.annotation.Sql;
 import io.github.tezch.atomsql.annotation.SqlProxy;
+import io.github.tezch.atomsql.annotation.processor.Methods;
+import io.github.tezch.atomsql.annotation.processor.OptionalDatas;
+import io.github.tezch.atomsql.annotation.processor.TooManyColumnsDataObject;
 
 /**
  * {@link SqlProxy}が生成する中間形態オブジェクトを表すクラスです。<br>
@@ -135,43 +151,77 @@ public class Atom<T> {
 
 	private final AtomSql atomSql;
 
-	private final Supplier<SqlProxyHelper> helperSupplier;
+	private final SqlProxyHelper helper;
 
-	private final Object nonThreadSafeHelperKey = new Object();
+	private final Supplier<SqlComposite> sqlSupplier;
+
+	private final PreparedStatementSetter preparedStatementSetter;
+
+	private final Object nonThreadSafeSqlKey = new Object();
 
 	private final boolean andType;
 
-	Atom(AtomSql atomsql, SqlProxyHelper helper, boolean andType) {
+	Atom(
+		AtomSql atomsql,
+		SqlProxyHelper helper,
+		SqlComposite sql,
+		boolean andType) {
 		this.atomSql = atomsql;
+		this.helper = helper;
 
-		if (helper.containsNonThreadSafeValue()) {
-			atomSql.registerHelperForNonThreadSafe(nonThreadSafeHelperKey, helper);
-			this.helperSupplier = () -> atomSql.getHelperForNonThreadSafe(nonThreadSafeHelperKey);
+		if (sql.containsNonThreadSafeValue) {
+			atomSql.registerSqlCompositeForNonThreadSafe(nonThreadSafeSqlKey, sql);
+			this.sqlSupplier = () -> atomSql.getHelperForNonThreadSafe(nonThreadSafeSqlKey);
 		} else {
-			this.helperSupplier = () -> helper;
+			this.sqlSupplier = () -> sql;
 		}
 
 		this.andType = andType;
+
+		preparedStatementSetter = createPreparedStatementSetter();
 	}
 
-	private Atom(AtomSql atomsql, Supplier<SqlProxyHelper> helperSupplier, boolean andType) {
+	private Atom(
+		AtomSql atomsql,
+		SqlProxyHelper helper,
+		Supplier<SqlComposite> sqlSupplier,
+		boolean andType) {
 		this.atomSql = atomsql;
-		this.helperSupplier = helperSupplier;
+		this.helper = helper;
+		this.sqlSupplier = sqlSupplier;
 		this.andType = andType;
+		preparedStatementSetter = createPreparedStatementSetter();
 	}
 
 	@SuppressWarnings("unchecked")
 	private RowMapper<T> dataObjectCreator() {
-		return (r, n) -> (T) helper().createDataObject(r);
-	}
-
-	private SqlProxyHelper helper() {
-		return helperSupplier.get();
+		return (r, n) -> (T) createDataObject(r);
 	}
 
 	private static Atom<?> newInstance(String sql) {
+		var caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
+
+		if (!caller.equals(Atom.class))
+			throw new SecurityException("Direct access not allowed");
+
 		var atomSql = new AtomSql();
-		return new Atom<>(atomSql, atomSql.helper(new SecureString(sql)), true);
+		return new Atom<>(
+			atomSql,
+			atomSql.helper(),
+			atomSql.sqlComposite(new SecureString(sql)),
+			true);
+	}
+
+	SqlProxyHelper helper() {
+		return helper;
+	}
+
+	SqlComposite sqlComposite() {
+		return sqlSupplier.get();
+	}
+
+	PreparedStatementSetter preparedStatementSetter() {
+		return preparedStatementSetter;
 	}
 
 	private static class Holder<T> {
@@ -185,6 +235,206 @@ public class Atom<T> {
 		private void set(T value) {
 			this.value = value;
 		}
+	}
+
+	Object createDataObject(ResultSet rs) {
+		var resultClass = helper.resultClass();
+		var typeFactory = helper.typeFactory();
+
+		if (resultClass == Object.class)
+			throw new IllegalStateException();
+
+		if (resultClass.isRecord()) {
+			return createRecordDataObject(rs);
+		}
+
+		//検索結果が単一の値の場合
+		if (typeFactory.canUse(resultClass)) {
+			try {
+				return typeFactory.select(resultClass).get(rs, 1);
+			} catch (SQLException e) {
+				throw new AtomSqlException(e);
+			}
+		}
+
+		Constructor<?> constructor;
+		try {
+			constructor = resultClass.getConstructor(ResultSet.class);
+		} catch (NoSuchMethodException e) {
+			return createDefaultConstructorClassDataObject(rs);
+		}
+
+		try {
+			return constructor.newInstance(rs);
+		} catch (InvocationTargetException | IllegalAccessException | InstantiationException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
+	private static Set<String> columnNamesFrom(ResultSet rs) {
+		try {
+			var metaData = rs.getMetaData();
+
+			var count = metaData.getColumnCount();
+
+			return new HashSet<>(IntStream.range(1, count + 1).mapToObj(i -> {
+				try {
+					return metaData.getColumnName(i).toUpperCase();
+				} catch (SQLException e) {
+					throw new AtomSqlException(e);
+				}
+			}).toList());
+		} catch (SQLException e) {
+			throw new AtomSqlException(e);
+		}
+	}
+
+	private Object createRecordDataObject(ResultSet rs) {
+		var resultClass = helper.resultClass();
+
+		Methods methods;
+		try {
+			methods = Class.forName(
+				resultClass.getName() + Constants.METADATA_CLASS_SUFFIX,
+				true,
+				Thread.currentThread().getContextClassLoader()).getAnnotation(Methods.class);
+		} catch (ClassNotFoundException e) {
+			throw new IllegalStateException(e);
+		}
+
+		var method = methods.value()[0];
+		var parameterNames = method.parameters();
+		var parameterTypes = method.parameterTypes();
+		var parameters = new Object[parameterNames.length];
+		var optionalColumns = method.parameterOptionalColumns();
+
+		var resultSetColumns = columnNamesFrom(rs);
+
+		var optionals = new Optionals();
+		for (var i = 0; i < parameterNames.length; i++) {
+			var parameterType = parameterTypes[i];
+			var parameterName = parameterNames[i];
+			var isOptionalColumn = optionalColumns[i];
+
+			var needsOptional = false;
+			if (Optional.class.equals(parameterType)) {
+				parameterType = optionals.get(parameterName);
+				needsOptional = true;
+			}
+
+			var type = helper.typeFactory().select(parameterType);
+			try {
+				//OptionalColumnではなく、SELECT句にカラムがない場合、値はnull
+				var value = (!isOptionalColumn || resultSetColumns.contains(parameterName.toUpperCase())) ? type.get(rs, parameterName) : null;
+				parameters[i] = needsOptional ? Optional.ofNullable(value) : value;
+			} catch (SQLException e) {
+				throw new AtomSqlException(e);
+			}
+		}
+
+		try {
+			var constructor = resultClass.getConstructor(parameterTypes);
+			return constructor.newInstance(parameters);
+		} catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException | InstantiationException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
+	private Object createDefaultConstructorClassDataObject(ResultSet rs) {
+		var resultClass = helper.resultClass();
+
+		var tooManyColumnsDataObject = resultClass.getAnnotation(TooManyColumnsDataObject.class);
+
+		Class<?> dataObjectClass;
+
+		if (tooManyColumnsDataObject == null) {
+			dataObjectClass = resultClass;
+		} else {
+			dataObjectClass = tooManyColumnsDataObject.bean();
+		}
+
+		Object object;
+
+		try {
+			var constructor = dataObjectClass.getConstructor();
+			object = constructor.newInstance();
+		} catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException | InstantiationException e) {
+			throw new IllegalStateException(e);
+		}
+
+		var resultSetColumns = columnNamesFrom(rs);
+
+		var optionals = new Optionals();
+		Arrays.stream(resultClass.getFields()).forEach(f -> {
+			var modifiers = f.getModifiers();
+			//フィールドがstaticの場合は対象から除外
+			//publicではない、finalの場合は以降の処理でエラーを起こすことで使用出来ないことを通知する
+			if (Modifier.isStatic(modifiers)) return;
+
+			var fieldName = f.getName();
+			var fieldType = f.getType();
+
+			var needsOptional = false;
+			if (Optional.class.equals(fieldType)) {
+				fieldType = optionals.get(fieldName);
+				needsOptional = true;
+			}
+
+			var type = helper.typeFactory().select(fieldType);
+
+			var isOptionalColumn = f.getAnnotation(OptionalColumn.class) != null;
+
+			try {
+				//OptionalColumnではなく、SELECT句にカラムがない場合、値はnull
+				var value = (!isOptionalColumn || resultSetColumns.contains(fieldName.toUpperCase())) ? type.get(rs, fieldName) : null;
+				f.set(object, needsOptional ? Optional.ofNullable(value) : value);
+			} catch (SQLException e) {
+				throw new AtomSqlException(e);
+			} catch (IllegalAccessException e) {
+				throw new IllegalStateException(e);
+			}
+		});
+
+		if (tooManyColumnsDataObject == null) {
+			return object;
+		}
+
+		try {
+			var constructor = resultClass.getConstructor(tooManyColumnsDataObject.bean());
+			return constructor.newInstance(object);
+		} catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException | InstantiationException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
+	private class Optionals {
+
+		Map<String, Class<?>> map;
+
+		private Class<?> get(String name) {
+			if (map == null) {
+				map = new HashMap<>();
+
+				Arrays.stream(loadOptionalDatas().value()).forEach(d -> map.put(d.name(), d.type()));
+			}
+
+			return map.get(name);
+		}
+	}
+
+	private OptionalDatas loadOptionalDatas() {
+		try {
+			return Class.forName(
+				helper.resultClass().getName() + Constants.DATA_OBJECT_METADATA_CLASS_SUFFIX,
+				true,
+				Thread.currentThread().getContextClassLoader()).getAnnotation(OptionalDatas.class);
+		} catch (ClassNotFoundException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
+	void logElapsed(long startNanos) {
+		AtomSql.logElapsed(helper.sqlLogger(), startNanos);
 	}
 
 	/**
@@ -201,13 +451,13 @@ public class Atom<T> {
 
 		var atomHolder = new Holder<Atom<?>>();
 
-		var helperHolder = new Holder<SqlProxyHelper>();
+		var sqlHolder = new Holder<SqlComposite>();
 
 		var caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
 
-		var atom = new Atom<>(atomSql, () -> {
-			synchronized (helperHolder) {
-				var helper = helperHolder.get();
+		var atom = new Atom<>(atomSql, atomSql.helper(), () -> {
+			synchronized (sqlHolder) {
+				var helper = sqlHolder.get();
 				if (helper != null) return helper;
 
 				var sql = Arrays.stream(caller.getDeclaredFields())
@@ -228,9 +478,9 @@ public class Atom<T> {
 					//自分自身が見つからなかった
 					.orElseThrow(() -> new IllegalStateException("Atom must be a static field in the calling class"));
 
-				helper = atomSql.helper(new SecureString(sql));
+				helper = atomSql.sqlComposite(new SecureString(sql));
 
-				helperHolder.set(helper);
+				sqlHolder.set(helper);
 
 				return helper;
 			}
@@ -375,9 +625,10 @@ public class Atom<T> {
 
 		return new Atom<R>(
 			atomSql,
-			new SqlProxyHelper(
-				helper(),
+			SqlProxyHelper.newHelper(
+				helper,
 				dataObjectClass),
+			sqlComposite(),
 			andType);
 	}
 
@@ -409,18 +660,17 @@ public class Atom<T> {
 	private <R> Stream<R> streamInternal(RowMapper<R> mapper) {
 		Objects.requireNonNull(mapper);
 
-		var helper = helper();
-
 		var startNanos = System.nanoTime();
 		try {
-			return helper.entry.endpoint()
+			return helper.entry()
+				.endpoint()
 				.queryForStream(
-					helper.sql.string(),
-					helper,
+					sqlComposite().compiled().sqlString(),
+					preparedStatementSetter,
 					mapper,
-					helper.sqlProxySnapshot());
+					helper.snapshot());
 		} finally {
-			helper.logElapsed(startNanos);
+			logElapsed(startNanos);
 		}
 	}
 
@@ -463,7 +713,7 @@ public class Atom<T> {
 	 * @return SQL文もしくはその一部
 	 */
 	public String sql() {
-		return helper().sql.string();
+		return sqlComposite().compiled().sqlString();
 	}
 
 	/**
@@ -472,7 +722,7 @@ public class Atom<T> {
 	 */
 	@Override
 	public String toString() {
-		return helper().sql.originalString();
+		return sqlComposite().originalString();
 	}
 
 	/**
@@ -480,7 +730,7 @@ public class Atom<T> {
 	 * @return 内部に持つSQLが空文字列である場合、true
 	 */
 	public boolean isEmpty() {
-		return helper().sql.isEmpty();
+		return sql().isEmpty();
 	}
 
 	private <E> Optional<E> get(List<E> list) {
@@ -497,19 +747,23 @@ public class Atom<T> {
 	 * @return 更新処理の場合、その結果件数
 	 */
 	public int execute() {
-		var helper = helper();
+		var entry = helper.entry();
 
 		var resources = atomSql.batchResources();
 		if (resources == null) {//バッチ実行中ではない
 			var startNanos = System.nanoTime();
 			try {
-				return helper.entry.endpoint().update(helper.sql.string(), helper, helper.sqlProxySnapshot());
+				return entry.endpoint()
+					.update(
+						sqlComposite().compiled().sqlString(),
+						preparedStatementSetter,
+						helper.snapshot());
 			} finally {
-				helper.logElapsed(startNanos);
+				logElapsed(startNanos);
 			}
 		}
 
-		resources.put(helper.entry.name(), helper, null, AtomSqlUtils.stackTrace());
+		resources.put(entry.name(), this, null, AtomSqlUtils.stackTrace());
 
 		return 0;
 	}
@@ -523,21 +777,30 @@ public class Atom<T> {
 	 * @see AtomSql#tryBatch(Supplier)
 	 */
 	public void execute(Consumer<Integer> resultConsumer) {
-		var helper = helper();
+		var entry = helper.entry();
 
 		var resources = atomSql.batchResources();
 		if (resources == null) {//バッチ実行中ではない
 			var startNanos = System.nanoTime();
 			try {
-				resultConsumer.accept(helper.entry.endpoint().update(helper.sql.string(), helper, helper.sqlProxySnapshot()));
+				resultConsumer.accept(
+					entry.endpoint()
+						.update(
+							sqlComposite().compiled().sql().toString(),
+							preparedStatementSetter,
+							helper.snapshot()));
 
 				return;
 			} finally {
-				helper.logElapsed(startNanos);
+				logElapsed(startNanos);
 			}
 		}
 
-		resources.put(helper.entry.name(), helper, Objects.requireNonNull(resultConsumer), AtomSqlUtils.stackTrace());
+		resources.put(
+			entry.name(),
+			this,
+			Objects.requireNonNull(resultConsumer),
+			AtomSqlUtils.stackTrace());
 	}
 
 	/**
@@ -550,7 +813,7 @@ public class Atom<T> {
 	public Atom<T> fuse(Atom<?>... others) {
 		var result = this;
 		for (var another : others) {
-			result = result.fuseWithInternal(InnerSql.BLANK, another);
+			result = result.fuseWithInternal(SqlComposite.BLANK, another);
 		}
 
 		return result;
@@ -565,7 +828,7 @@ public class Atom<T> {
 	 */
 	public Atom<T> fuseWith(Atom<?> delimiter, Atom<?>... others) {
 		var result = this;
-		var delimiterPart = delimiter.helper().sql;
+		var delimiterPart = delimiter.sqlComposite();
 		for (var another : others) {
 			result = result.fuseWithInternal(delimiterPart, another);
 		}
@@ -573,14 +836,15 @@ public class Atom<T> {
 		return result;
 	}
 
-	private Atom<T> fuseWithInternal(InnerSql delimiter, Atom<?> another) {
+	private Atom<T> fuseWithInternal(SqlComposite delimiter, Atom<?> another) {
 		Objects.requireNonNull(another);
 
-		var helper = helper();
-		var anotherHelper = another.helper();
-
-		var sql = concat(delimiter, helper.sql, anotherHelper.sql);
-		return new Atom<T>(atomSql, new SqlProxyHelper(sql, helper), true);
+		var sql = concat(delimiter, sqlComposite(), another.sqlComposite());
+		return new Atom<T>(
+			atomSql,
+			helper,
+			sql,
+			true);
 	}
 
 	/**
@@ -648,17 +912,16 @@ public class Atom<T> {
 	 * @return 展開された新しい{@link Atom}
 	 */
 	public Atom<T> implant(Atom<?>... atoms) {
-		var helper = helper();
+		var sql = sqlComposite();
 
-		var sql = helper.sql;
 		for (int i = 0; i < atoms.length; i++) {
 			var atom = atoms[i];
 
 			var pattern = pattern(String.valueOf(i));
-			sql = sql.put(pattern, atom.helper().sql);
+			sql = sql.replace(pattern, atom.sqlComposite());
 		}
 
-		return new Atom<T>(atomSql, new SqlProxyHelper(sql, helper), true);
+		return new Atom<T>(atomSql, helper, sql, true);
 	}
 
 	/**
@@ -671,12 +934,11 @@ public class Atom<T> {
 	 * @return 展開された新しい{@link Atom}
 	 */
 	public Atom<T> implant(String keyword, Atom<?> atom) {
-		var helper = helper();
-		var sql = helper.sql;
+		var sql = sqlComposite();
 
 		var pattern = pattern(Objects.requireNonNull(keyword));
 
-		return new Atom<T>(atomSql, new SqlProxyHelper(sql.put(pattern, atom.helper().sql), helper), true);
+		return new Atom<T>(atomSql, helper, sql.replace(pattern, atom.sqlComposite()), true);
 	}
 
 	/**
@@ -688,17 +950,16 @@ public class Atom<T> {
 	 * @return 展開された新しい{@link Atom}
 	 */
 	public Atom<T> implant(Map<String, Atom<?>> atoms) {
-		var helper = helper();
-		var sql = new InnerSql[] { helper.sql };
+		var sql = new SqlComposite[] { sqlComposite() };
 
 		atoms.entrySet().stream().forEach(e -> {
 			var atom = e.getValue();
 
 			var pattern = pattern(Objects.requireNonNull(e.getKey()));
-			sql[0] = sql[0].put(pattern, atom.helper().sql);
+			sql[0] = sql[0].replace(pattern, atom.sqlComposite());
 		});
 
-		return new Atom<T>(atomSql, new SqlProxyHelper(sql[0], helper), true);
+		return new Atom<T>(atomSql, helper, sql[0], true);
 	}
 
 	private static Pattern pattern(String keyword) {
@@ -714,7 +975,7 @@ public class Atom<T> {
 	 * @return 結合された新しい{@link Atom}
 	 */
 	public Atom<T> and(Atom<?> another) {
-		return andOr(InnerSql.AND, another, true);
+		return andOr(SqlComposite.AND, another, true);
 	}
 
 	/**
@@ -728,42 +989,120 @@ public class Atom<T> {
 	public Atom<T> or(Atom<?> another) {
 		//どちらか一方でも空の場合OR結合が発生しないのでAND状態のままとする
 		var andType = isEmpty() || another.isEmpty();
-		return andOr(InnerSql.OR, another, andType);
+		return andOr(SqlComposite.OR, another, andType);
 	}
 
-	private Atom<T> andOr(InnerSql delimiter, Atom<?> another, boolean andTypeCurrent) {
+	private Atom<T> andOr(SqlComposite delimiter, Atom<?> another, boolean andTypeCurrent) {
 		Objects.requireNonNull(another);
 
-		var helper = helper();
-		var anotherHelper = another.helper();
-
-		var sql = guardSql(andType, andTypeCurrent, helper);
-		var anotherSql = guardSql(another.andType, andTypeCurrent, anotherHelper);
+		var sql = guardSql(andType, andTypeCurrent, this);
+		var anotherSql = guardSql(another.andType, andTypeCurrent, another);
 
 		return new Atom<T>(
 			atomSql,
-			new SqlProxyHelper(concat(delimiter, sql, anotherSql), helper),
+			helper,
+			concat(delimiter, sql, anotherSql),
 			andTypeCurrent);
 	}
 
-	private static InnerSql concat(InnerSql delimiter, InnerSql sql1, InnerSql sql2) {
+	private static SqlComposite concat(SqlComposite delimiter, SqlComposite sql1, SqlComposite sql2) {
 		if (sql1.isBlank()) return sql2;
 		if (sql2.isBlank()) return sql1;
 
 		return sql1.concat(delimiter).concat(sql2);
 	}
 
-	private static InnerSql guardSql(boolean andType, boolean andTypeCurrent, SqlProxyHelper helper) {
+	private static SqlComposite guardSql(boolean andType, boolean andTypeCurrent, Atom<?> atom) {
+		var sql = atom.sqlComposite();
+
 		if (!andType && andTypeCurrent) {//現在ORでAND追加された場合
-			return helper.sql.isBlank() ? InnerSql.EMPTY : helper.sql.join(leftParen, rightParen);
+			return sql.isBlank() ? SqlComposite.EMPTY : sql.join(leftParen, rightParen);
 		}
 
-		return helper.sql;
+		return sql;
 	}
 
 	private static <T> List<T> listAndClose(Stream<T> stream) {
 		try (stream) {
 			return stream.toList();
 		}
+	}
+
+	private PreparedStatementSetter createPreparedStatementSetter() {
+		return new PreparedStatementSetter() {
+
+			@Override
+			public void setValues(PreparedStatement ps, Optional<StackTraceElement[]> stackTrace) throws SQLException {
+				int[] i = { 1 };
+
+				var sqlComposite = sqlComposite();
+
+				var sql = sqlComposite.compiled();
+
+				sql.placeholders().forEach(p -> i[0] = p.type().bind(i[0], ps, p.value()));
+
+				helper.sqlLogger().perform(logger -> {
+					var entry = helper.entry();
+
+					var snapshot = helper.snapshot();
+
+					logger.log(Level.INFO, "------ SQL START ------");
+
+					if (entry.name() != null) {
+						logger.log(Level.INFO, "name: " + entry.name());
+					}
+
+					logger.log(Level.INFO, "call from:");
+
+					for (var element : stackTrace.get()) {
+						var elementString = element.toString();
+
+						//無名モジュールから呼ばれた場合、moduleNameはnull
+						//Atom SQLモジュール名に前方一致するものは、Atom SQL関連ソースとして除外する
+						if ((AtomSql.moduleName != null && elementString.startsWith(AtomSql.moduleName))
+							|| elementString.startsWith("java.") //java.で始まるモジュール名は除外
+							|| elementString.contains("(Unknown Source)")
+							|| elementString.contains("<generated>"))
+							continue;
+
+						if (AtomSql.configure().logStackTracePattern().matcher(elementString).find())
+							logger.log(Level.INFO, " " + elementString);
+					}
+
+					var placeholders = sql.placeholders();
+
+					if (placeholders.stream().filter(p -> p.confidential()).findFirst().isPresent()) {
+						var bindingValues = placeholders.stream().map(p -> {
+							String value;
+							if (p.confidential()) {
+								value = Constants.CONFIDENTIAL;
+							} else {
+								value = AtomSqlUtils.toStringForBindingValue(p.value());
+							}
+
+							return new BindingValue(p.name().toString(), value);
+						}).toList();
+
+						entry.endpoint()
+							.logConfidentialSql(
+								logger,
+								sqlComposite.originalString(),
+								sql.sqlString(),
+								bindingValues,
+								snapshot);
+					} else {
+						entry.endpoint()
+							.logSql(
+								logger,
+								sqlComposite.originalString(),
+								sql.sqlString(),
+								ps,
+								snapshot);
+					}
+
+					logger.log(Level.INFO, "------  SQL END  ------");
+				});
+			}
+		};
 	}
 }
