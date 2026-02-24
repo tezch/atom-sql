@@ -56,4 +56,13 @@ public interface Configure {
 	 * @return バッチ更新時の閾値
 	 */
 	int batchThreshold();
+
+	/**
+	 * cache-capacity<br>
+	 * キャッシュの最大値<br>
+	 * この値を超えると古いキャッシュから削除される<br>
+	 * この値が0以下の場合、キャッシュは行わない
+	 * @return キャッシュの最大値
+	 */
+	int cacheCapacity();
 }

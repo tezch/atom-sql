@@ -5,6 +5,7 @@ import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -310,6 +312,38 @@ public class AtomSql {
 		return instance;
 	}
 
+	/**
+	 * このインスタンスが持つ{@link SqlProxy}情報のキャッシュをクリアします。
+	 */
+	public void clearCache() {
+		synchronized (cache) {
+			cache.clear();
+		}
+	}
+
+	@SuppressWarnings("serial")
+	private static class Cache extends LinkedHashMap<Method, Helpers> {
+
+		private final int capacity;
+
+		public Cache(int capacity) {
+			super(0, 0.75f, true);
+			this.capacity = capacity;
+		}
+
+		@Override
+		protected boolean removeEldestEntry(Map.Entry<Method, Helpers> eldest) {
+			return size() > capacity;
+		}
+	}
+
+	private static Cache cache() {
+		var capacity = configure().cacheCapacity();
+		return capacity > 0 ? new Cache(capacity) : null;
+	}
+
+	private final Cache cache = cache();
+
 	private Object invokeMethod(Object proxy, Method method, Object[] args) throws Throwable {
 		if (method.isDefault()) return InvocationHandler.invokeDefault(proxy, method, args);
 
@@ -320,9 +354,6 @@ public class AtomSql {
 		if (returnType.isAnnotationPresent(SqlProxy.class)) return of(returnType);
 
 		var proxyInterface = proxy.getClass().getInterfaces()[0];
-
-		//メソッドに付与されたアノテーション > クラスに付与されたアノテーション
-		var nameAnnotation = qualifier(method).or(() -> qualifier(proxyInterface));
 
 		var proxyName = proxyInterface.getName();
 
@@ -339,8 +370,86 @@ public class AtomSql {
 			.findFirst()
 			.get();
 
-		var parameterTypes = metadata.parameterTypes();
+		var parameterBinderClass = metadata.parameterBinder();
 
+		Optional<ParameterBinderInfo> parameterBinderInfo = Optional.empty();
+		Object[] computedValues;
+		if (!parameterBinderClass.equals(Object.class)) {
+			var parameterBinder = parameterBinderClass.getConstructor().newInstance();
+
+			Consumer.class.getMethod("accept", Object.class).invoke(args[0], new Object[] { parameterBinder });
+
+			var values = new LinkedList<Object>();
+
+			var fields = Arrays.stream(parameterBinderClass.getFields()).toList();
+
+			fields.forEach(f -> {
+				Object value;
+				try {
+					value = f.get(parameterBinder);
+				} catch (IllegalAccessException e) {
+					throw new IllegalStateException(e);
+				}
+
+				values.add(value);
+			});
+
+			computedValues = values.toArray(new Object[values.size()]);
+
+			parameterBinderInfo = Optional.of(new ParameterBinderInfo(fields, values));
+		} else {
+			computedValues = args;
+		}
+
+		Helpers helpers;
+		if (cache == null) {
+			helpers = helpers(proxyInterface, method, metadata, parameterBinderInfo).helpers;
+		} else {
+			synchronized (cache) {
+				helpers = cache.get(method);
+
+				if (helpers == null) {
+					var result = helpers(proxyInterface, method, metadata, parameterBinderInfo);
+
+					if (result.canCache) cache.put(method, result.helpers);
+
+					helpers = result.helpers;
+				}
+			}
+		}
+
+		var atom = new Atom<Object>(
+			AtomSql.this,
+			helpers.sqlProxyHelper,
+			SqlComposite.createSqlComposite(helpers.sqlCompositeHelper, computedValues),
+			true);
+
+		if (returnType.equals(Atom.class)) {
+			return atom;
+		} else if (returnType.equals(Stream.class)) {
+			return atom.stream();
+		} else if (returnType.equals(List.class)) {
+			return atom.list();
+		} else if (returnType.equals(Optional.class)) {
+			return atom.get();
+		} else if (returnType.equals(int.class) || returnType.equals(void.class)) {
+			return atom.execute();
+		} else if (returnType.equals(Protoatom.class)) {
+			return new Protoatom<>(atom, metadata.protoatomImplanter());
+		} else {
+			//不正な戻り値の型
+			throw new IllegalStateException("Incorrect return type: " + returnType);
+		}
+	}
+
+	private static record ParameterBinderInfo(List<Field> fields, List<Object> values) {}
+
+	private HelpersResult helpers(
+		Class<?> proxyInterface,
+		Method method,
+		io.github.tezch.atomsql.annotation.processor.Method metadata,
+		Optional<ParameterBinderInfo> parameterBinderInfo)
+		throws Throwable {
 		var parameterNames = metadata.parameters();
 
 		var confidentialSql = method.getAnnotation(ConfidentialSql.class);
@@ -358,8 +467,6 @@ public class AtomSql {
 
 		var parameterBinderClass = metadata.parameterBinder();
 
-		var parameterBinderType = !parameterBinderClass.equals(Object.class);
-
 		for (int i = 0; i < parameterNames.length; i++) {
 			var name = parameterNames[i];
 			var annotations = parameterAnnotations[i];
@@ -368,7 +475,7 @@ public class AtomSql {
 				.filter(a -> a instanceof Confidential)
 				.findFirst()
 				.ifPresent(a -> {
-					if (parameterBinderType) {
+					if (parameterBinderInfo.isPresent()) {
 						Arrays.stream(parameterBinderClass.getFields()).map(f -> f.getName()).forEach(confidentials::add);
 					} else {
 						confidentials.add(name);
@@ -410,7 +517,7 @@ public class AtomSql {
 
 			@Override
 			public String getClassName() {
-				return proxyName;
+				return proxyInterface.getName();
 			}
 
 			@Override
@@ -438,35 +545,30 @@ public class AtomSql {
 			}
 		};
 
-		//TODO cache helper
-		SqlProxyHelper helper = new SqlProxyHelper(
-			nameAnnotation.map(a -> endpoints.get(a.value())).orElseGet(() -> endpoints.get()),
-			metadata.result(),
-			typeFactory,
-			mySqlLogger,
-			snapshot);
+		boolean[] canCache = { true };
 
-		SqlComposite sqlComposite;
-		if (parameterTypes.length == 1 && parameterTypes[0].equals(Consumer.class)) {
-			var parameterBinder = parameterBinderClass.getConstructor().newInstance();
-
-			Consumer.class.getMethod("accept", Object.class).invoke(args[0], new Object[] { parameterBinder });
+		SqlCompositeHelper sqlCompositeHelper;
+		if (parameterBinderInfo.isPresent()) {
+			var info = parameterBinderInfo.get();
 
 			var names = new LinkedList<String>();
-			var values = new LinkedList<Object>();
 			var types = new LinkedList<AtomSqlType>();
-			Arrays.stream(parameterBinderClass.getFields()).forEach(f -> {
-				names.add(f.getName());
 
-				Object value;
-				try {
-					value = f.get(parameterBinder);
-				} catch (IllegalAccessException e) {
-					throw new IllegalStateException(e);
-				}
+			var size = info.fields.size();
+			for (int i = 0; i < size; i++) {
+				var field = info.fields.get(i);
+				var value = info.values.get(i);
 
-				var t = f.getType();
+				var name = field.getName();
+
+				names.add(name);
+
+				var t = field.getType();
 				if (t.equals(Object.class)) {
+					// 型がObjectの場合、実際の値を見てPreparedStatementのsetメソッドを決定せざるを得ないので毎回判定が必要
+					// そのためキャッシュさせない
+					canCache[0] = false;
+
 					if (value == null) {
 						//値がnullの場合、仕方がないのでPreparedStatementにnullを設定できるようにNULLをセットする
 						types.add(NULL.instance);
@@ -474,57 +576,43 @@ public class AtomSql {
 						types.add(typeFactory.select(value.getClass()));
 					}
 				} else {
-					types.add(typeFactory.select(f.getType()));
+					types.add(typeFactory.select(field.getType()));
 				}
+			}
 
-				values.add(value);
-			});
-
-			//TODO cache
-			var sqlCompositeHelper = new SqlCompositeHelper(
+			sqlCompositeHelper = new SqlCompositeHelper(
 				sql,
 				confidentials,
 				names.toArray(String[]::new),
 				types.toArray(AtomSqlType[]::new),
 				metadata.nonThreadSafe());
-
-			sqlComposite = SqlComposite.createSqlComposite(sqlCompositeHelper, values.toArray(Object[]::new));
 		} else {
 			var types = Arrays.stream(metadata.parameterTypes()).map(c -> typeFactory.select(c)).toArray(AtomSqlType[]::new);
 
-			var sqlCompositeHelper = new SqlCompositeHelper(
+			sqlCompositeHelper = new SqlCompositeHelper(
 				sql,
 				confidentials,
 				parameterNames,
 				types,
 				metadata.nonThreadSafe());
-
-			sqlComposite = SqlComposite.createSqlComposite(sqlCompositeHelper, args);
 		}
 
-		var atom = new Atom<Object>(
-			AtomSql.this,
-			helper,
-			sqlComposite,
-			true);
+		//メソッドに付与されたアノテーション > クラスに付与されたアノテーション
+		var nameAnnotation = qualifier(method).or(() -> qualifier(proxyInterface));
 
-		if (returnType.equals(Atom.class)) {
-			return atom;
-		} else if (returnType.equals(Stream.class)) {
-			return atom.stream();
-		} else if (returnType.equals(List.class)) {
-			return atom.list();
-		} else if (returnType.equals(Optional.class)) {
-			return atom.get();
-		} else if (returnType.equals(int.class) || returnType.equals(void.class)) {
-			return atom.execute();
-		} else if (returnType.equals(Protoatom.class)) {
-			return new Protoatom<>(atom, metadata.protoatomImplanter());
-		} else {
-			//不正な戻り値の型
-			throw new IllegalStateException("Incorrect return type: " + returnType);
-		}
+		SqlProxyHelper sqlProxyHelper = new SqlProxyHelper(
+			nameAnnotation.map(a -> endpoints.get(a.value())).orElseGet(() -> endpoints.get()),
+			metadata.result(),
+			typeFactory,
+			mySqlLogger,
+			snapshot);
+
+		return new HelpersResult(new Helpers(sqlProxyHelper, sqlCompositeHelper), canCache[0]);
 	}
+
+	private static record HelpersResult(Helpers helpers, boolean canCache) {}
+
+	private static record Helpers(SqlProxyHelper sqlProxyHelper, SqlCompositeHelper sqlCompositeHelper) {}
 
 	/**
 	 * バッチ処理を実施します。<br>

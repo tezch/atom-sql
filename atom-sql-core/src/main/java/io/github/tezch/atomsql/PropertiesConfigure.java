@@ -2,6 +2,7 @@ package io.github.tezch.atomsql;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
@@ -58,6 +59,14 @@ public class PropertiesConfigure implements Configure {
 	private final int batchThreshold;
 
 	/**
+	 * cache-capacity<br>
+	 * キャッシュの最大値<br>
+	 * この値を超えると古いキャッシュから削除される<br>
+	 * この値が0以下の場合、キャッシュは行わない
+	 */
+	private final int cacheCapacity;
+
+	/**
 	 * クラスパスのルートにあるatom-sql.propertiesから設定を読み込みインスタンスを作成します。
 	 */
 	public PropertiesConfigure() {
@@ -81,6 +90,10 @@ public class PropertiesConfigure implements Configure {
 		typeFactoryClass = config.getProperty("type-factory-class", null);
 
 		batchThreshold = Integer.parseInt(config.getProperty("batch-threshold", "0"));
+
+		cacheCapacity = Optional.ofNullable(config.getProperty("cache-capacity"))
+			.map(Integer::parseInt)
+			.orElse(Integer.MAX_VALUE);
 	}
 
 	@Override
@@ -111,5 +124,10 @@ public class PropertiesConfigure implements Configure {
 	@Override
 	public int batchThreshold() {
 		return batchThreshold;
+	}
+
+	@Override
+	public int cacheCapacity() {
+		return cacheCapacity;
 	}
 }

@@ -88,13 +88,16 @@ public class AtomSqlContextInitializer implements ApplicationContextInitializer<
 
 		var batchThreshold = environment.getProperty("atomsql.batch-threshold", Integer.class, 0);
 
+		var cacheCapacity = environment.getProperty("atomsql.cache-capacity", Integer.class, Integer.MAX_VALUE);
+
 		return new SimpleConfigure(
 			enableLog,
 			Pattern.compile(logStackTracePattern),
 			shouldIgnoreNoSqlLog,
 			usesQualifier,
 			typeFactoryClass,
-			batchThreshold);
+			batchThreshold,
+			cacheCapacity);
 	}
 
 	private Endpoints endpoints(GenericApplicationContext context) {
