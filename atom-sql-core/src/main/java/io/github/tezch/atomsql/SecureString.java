@@ -2,12 +2,14 @@ package io.github.tezch.atomsql;
 
 import java.util.Set;
 
+import io.github.tezch.atomsql.SqlComposite.Prototype;
 import io.github.tezch.atomsql.SqlComposite.Text;
 
 final class SecureString {
 
 	private static Set<Class<?>> permittedCallers = Set.of(
 		Text.class,
+		Prototype.class,
 		SqlComposite.class,
 		Atom.class,
 		AtomSql.class);

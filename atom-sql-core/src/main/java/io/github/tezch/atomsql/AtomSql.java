@@ -24,12 +24,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import io.github.tezch.atomsql.SqlComposite.Component;
+import io.github.tezch.atomsql.SqlComposite.Prototype;
 import io.github.tezch.atomsql.SqlComposite.SqlCompositeHelper;
+import io.github.tezch.atomsql.SqlComposite.Text;
 import io.github.tezch.atomsql.annotation.Confidential;
 import io.github.tezch.atomsql.annotation.ConfidentialSql;
 import io.github.tezch.atomsql.annotation.NoSqlLog;
@@ -581,16 +585,18 @@ public class AtomSql {
 				}
 			}
 
-			sqlCompositeHelper = new SqlCompositeHelper(
+			var fieldNames = names.toArray(String[]::new);
+
+			sqlCompositeHelper = sqlCompositeHelper(
 				sql,
 				confidentials,
-				names.toArray(String[]::new),
+				fieldNames,
 				types.toArray(AtomSqlType[]::new),
 				metadata.nonThreadSafe());
 		} else {
 			var types = Arrays.stream(metadata.parameterTypes()).map(c -> typeFactory.select(c)).toArray(AtomSqlType[]::new);
 
-			sqlCompositeHelper = new SqlCompositeHelper(
+			sqlCompositeHelper = sqlCompositeHelper(
 				sql,
 				confidentials,
 				parameterNames,
@@ -614,6 +620,40 @@ public class AtomSql {
 	private static record HelpersResult(Helpers helpers, boolean canCache) {}
 
 	private static record Helpers(SqlProxyHelper sqlProxyHelper, SqlCompositeHelper sqlCompositeHelper) {}
+
+	private static SqlCompositeHelper sqlCompositeHelper(
+		SecureString secureSql,
+		Set<String> confidentials,
+		String[] parameterNames,
+		AtomSqlType[] parameterTypes,
+		boolean containsNonThreadSafeValue) {
+		Map<String, AtomSqlType> map = new HashMap<>();
+		for (int i = 0; i < parameterNames.length; i++) {
+			map.put(parameterNames[i], parameterTypes[i]);
+		}
+
+		List<Component> components = new ArrayList<>();
+
+		var sql = ColumnFinder.normalize(secureSql.toString());
+
+		var sqlRemain = PlaceholderFinder.execute(sql, f -> {
+			components.add(new Text(new SecureString(f.gap)));
+
+			if (!map.containsKey(f.placeholder))
+				throw new PlaceholderNotFoundException(f.placeholder);
+
+			components.add(
+				new Prototype(
+					f.placeholder,
+					confidentials.contains(f.placeholder),
+					f.all,
+					map.get(f.placeholder)));
+		});
+
+		components.add(new Text(new SecureString(sqlRemain)));
+
+		return new SqlCompositeHelper(components, parameterNames, containsNonThreadSafeValue);
+	}
 
 	/**
 	 * バッチ処理を実施します。<br>
@@ -852,7 +892,7 @@ public class AtomSql {
 
 	SqlComposite sqlComposite(SecureString sql) {
 		return SqlComposite.createSqlComposite(
-			new SqlCompositeHelper(
+			sqlCompositeHelper(
 				sql,
 				null,
 				emptyStringArray,

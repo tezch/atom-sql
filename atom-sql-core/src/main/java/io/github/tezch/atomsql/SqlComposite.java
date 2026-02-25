@@ -5,7 +5,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
@@ -20,10 +19,8 @@ class SqlComposite {
 	static final SqlComposite OR = new SqlComposite(new SecureString(" OR "));
 
 	static record SqlCompositeHelper(
-		SecureString secureSql,
-		Set<String> confidentials,
+		List<Component> prototypes,
 		String[] parameterNames,
-		AtomSqlType[] parameterTypes,
 		boolean containsNonThreadSafeValue) {}
 
 	static record Compiled(List<Placeholder> placeholders, SecureString sql) {
@@ -34,49 +31,23 @@ class SqlComposite {
 	}
 
 	static SqlComposite createSqlComposite(SqlCompositeHelper helper, Object[] args) {
-		Map<String, TypeAndArg> map = new HashMap<>();
+		Map<String, Object> map = new HashMap<>();
 		for (int i = 0; i < helper.parameterNames.length; i++) {
-			map.put(
-				helper.parameterNames[i],
-				new TypeAndArg(helper.parameterTypes[i], args[i]));
+			map.put(helper.parameterNames[i], args[i]);
 		}
 
-		List<Component> components = new ArrayList<>();
-
-		var sql = ColumnFinder.normalize(helper.secureSql.toString());
-
-		var sqlRemain = PlaceholderFinder.execute(sql, f -> {
-			components.add(new Text(new SecureString(f.gap)));
-
-			if (!map.containsKey(f.placeholder))
-				throw new PlaceholderNotFoundException(f.placeholder);
-
-			var typeAndArg = map.get(f.placeholder);
-			var value = typeAndArg.arg();
-			var type = typeAndArg.type();
-
-			components.add(
-				new Placeholder(
-					new SecureString(f.placeholder),
-					helper.confidentials.contains(f.placeholder),
-					new SecureString(type.placeholderExpression(value)),
-					f.all,
-					type,
-					value));
-		});
-
-		components.add(new Text(new SecureString(sqlRemain)));
+		List<Component> components = helper.prototypes.stream().map(p -> p.complement(map)).toList();
 
 		return new SqlComposite(components, helper.containsNonThreadSafeValue);
 	}
-
-	private static record TypeAndArg(AtomSqlType type, Object arg) {}
 
 	static interface Component {
 
 		void replaceAndAdd(Pattern pattern, SqlComposite another, List<Component> components);
 
 		void placeholder(Consumer<Placeholder> consumer);
+
+		Component complement(Map<String, Object> map);
 
 		void appendTo(StringBuilder builder);
 
@@ -112,6 +83,11 @@ class SqlComposite {
 		public void placeholder(Consumer<Placeholder> consumer) {}
 
 		@Override
+		public Component complement(Map<String, Object> map) {
+			return this;
+		}
+
+		@Override
 		public void appendTo(StringBuilder builder) {
 			builder.append(text);
 		}
@@ -133,7 +109,7 @@ class SqlComposite {
 	}
 
 	static record Placeholder(
-		SecureString name, //プレースホルダ名
+		String name, //プレースホルダ名
 		boolean confidential,
 		SecureString expression, //置換後のプレースホルダ
 		String original, //元のプレースホルダ文字列全体（型ヒントを含む）
@@ -149,6 +125,11 @@ class SqlComposite {
 		@Override
 		public void placeholder(Consumer<Placeholder> consumer) {
 			consumer.accept(this);
+		}
+
+		@Override
+		public Component complement(Map<String, Object> map) {
+			throw new UnsupportedOperationException();
 		}
 
 		@Override
@@ -172,19 +153,69 @@ class SqlComposite {
 		}
 	}
 
+	static record Prototype(
+		String name, //プレースホルダ名
+		boolean confidential,
+		String original, //元のプレースホルダ文字列全体（型ヒントを含む）
+		AtomSqlType type //型
+	) implements Component {
+
+		@Override
+		public void replaceAndAdd(Pattern pattern, SqlComposite another, List<Component> components) {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public void placeholder(Consumer<Placeholder> consumer) {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public Component complement(Map<String, Object> map) {
+			var value = map.get(name);
+			return new Placeholder(
+				name,
+				confidential,
+				new SecureString(type.placeholderExpression(value)),
+				original,
+				type,
+				value);
+		}
+
+		@Override
+		public void appendTo(StringBuilder builder) {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public void appendOriginalTo(StringBuilder builder) {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public boolean isEmpty() {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public boolean isBlank() {
+			throw new UnsupportedOperationException();
+		}
+	}
+
 	final boolean containsNonThreadSafeValue;
 
 	private final List<Component> components;
 
 	private final Compiled compiled;
 
-	SqlComposite(List<Component> components, boolean containsNonThreadSafeValue) {
+	private SqlComposite(List<Component> components, boolean containsNonThreadSafeValue) {
 		this.components = List.copyOf(new ArrayList<>(components));
 		this.containsNonThreadSafeValue = containsNonThreadSafeValue;
 		compiled = new Compiled(List.copyOf(placeholders()), new SecureString(string()));
 	}
 
-	SqlComposite(SecureString text) {
+	private SqlComposite(SecureString text) {
 		this.components = Collections.singletonList(new Text(text));
 		containsNonThreadSafeValue = false;
 		compiled = new Compiled(placeholders(), new SecureString(string()));
