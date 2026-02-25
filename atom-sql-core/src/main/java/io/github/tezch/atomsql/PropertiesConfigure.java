@@ -93,7 +93,7 @@ public class PropertiesConfigure implements Configure {
 
 		cacheCapacity = Optional.ofNullable(config.getProperty("cache-capacity"))
 			.map(Integer::parseInt)
-			.orElse(Integer.MAX_VALUE);
+			.orElse(1000);
 	}
 
 	@Override

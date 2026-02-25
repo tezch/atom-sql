@@ -372,6 +372,7 @@ public class AtomSql {
 
 		var parameterBinderClass = metadata.parameterBinder();
 
+		// ParameterBinderを使用している場合、同じ処理を二度しないためスキャンした内容をhelper作成に引き渡す
 		Optional<ParameterBinderInfo> parameterBinderInfo = Optional.empty();
 		Object[] computedValues;
 		if (!parameterBinderClass.equals(Object.class)) {
@@ -402,7 +403,7 @@ public class AtomSql {
 		}
 
 		Helpers helpers;
-		if (cache == null) {
+		if (cache == null) {//キャッシュを利用しない設定の場合
 			helpers = helpers(proxyInterface, method, metadata, parameterBinderInfo).helpers;
 		} else {
 			synchronized (cache) {
@@ -706,7 +707,7 @@ public class AtomSql {
 			try {
 				s.close();
 			} catch (Throwable t) {
-				logger.log(Level.WARNING, "Error occured while Stream closing", t);
+				logger.log(Level.WARNING, "Error occured while closing a stream", t);
 			}
 		});
 	}

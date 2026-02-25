@@ -1,8 +1,8 @@
 package io.github.tezch.atomsql;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,7 +41,7 @@ class SqlComposite {
 				new TypeAndArg(helper.parameterTypes[i], args[i]));
 		}
 
-		List<Component> components = new LinkedList<>();
+		List<Component> components = new ArrayList<>();
 
 		var sql = ColumnFinder.normalize(helper.secureSql.toString());
 
@@ -179,9 +179,9 @@ class SqlComposite {
 	private final Compiled compiled;
 
 	SqlComposite(List<Component> components, boolean containsNonThreadSafeValue) {
-		this.components = Collections.unmodifiableList(new LinkedList<>(components));
+		this.components = List.copyOf(new ArrayList<>(components));
 		this.containsNonThreadSafeValue = containsNonThreadSafeValue;
-		compiled = new Compiled(placeholders(), new SecureString(string()));
+		compiled = new Compiled(List.copyOf(placeholders()), new SecureString(string()));
 	}
 
 	SqlComposite(SecureString text) {
@@ -195,7 +195,7 @@ class SqlComposite {
 	}
 
 	List<Placeholder> placeholders() {
-		List<Placeholder> placeholders = new LinkedList<>();
+		List<Placeholder> placeholders = new ArrayList<>();
 		components.forEach(e -> e.placeholder(placeholders::add));
 
 		return placeholders;
@@ -216,14 +216,14 @@ class SqlComposite {
 	}
 
 	SqlComposite replace(Pattern pattern, SqlComposite another) {
-		List<Component> components = new LinkedList<>();
+		List<Component> components = new ArrayList<>();
 		this.components.forEach(e -> e.replaceAndAdd(pattern, another, components));
 
 		return new SqlComposite(components, containsNonThreadSafeValue || another.containsNonThreadSafeValue);
 	}
 
 	SqlComposite concat(SqlComposite another) {
-		List<Component> components = new LinkedList<>();
+		List<Component> components = new ArrayList<>();
 		components.addAll(this.components);
 		components.addAll(another.components);
 
@@ -231,7 +231,7 @@ class SqlComposite {
 	}
 
 	SqlComposite join(SecureString prefix, SecureString suffix) {
-		List<Component> components = new LinkedList<>();
+		List<Component> components = new ArrayList<>();
 		components.add(new Text(prefix));
 		components.addAll(this.components);
 		components.add(new Text(suffix));
@@ -242,21 +242,13 @@ class SqlComposite {
 	boolean isEmpty() {
 		if (components.size() == 0) return true;
 
-		for (var e : components) {
-			if (!e.isEmpty()) return false;
-		}
-
-		return true;
+		return components.stream().allMatch(Component::isEmpty);
 	}
 
 	boolean isBlank() {
 		if (components.size() == 0) return true;
 
-		for (var e : components) {
-			if (!e.isBlank()) return false;
-		}
-
-		return true;
+		return components.stream().allMatch(Component::isBlank);
 	}
 
 	@Override
