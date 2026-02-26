@@ -36,9 +36,15 @@ class SqlComposite {
 			map.put(helper.parameterNames[i], args[i]);
 		}
 
-		List<Component> components = helper.prototypes.stream().map(p -> p.complement(map)).toList();
+		List<Component> components = helper.prototypes.stream().map(p -> p.bind(map)).toList();
 
 		return new SqlComposite(components, helper.containsNonThreadSafeValue);
+	}
+
+	static SqlComposite rebind(SqlComposite base, Map<String, Object> values) {
+		List<Component> components = base.components.stream().map(p -> p.bind(values)).toList();
+
+		return new SqlComposite(components, base.containsNonThreadSafeValue);
 	}
 
 	static interface Component {
@@ -47,7 +53,7 @@ class SqlComposite {
 
 		void placeholder(Consumer<Placeholder> consumer);
 
-		Component complement(Map<String, Object> map);
+		Component bind(Map<String, Object> values);
 
 		void appendTo(StringBuilder builder);
 
@@ -83,7 +89,7 @@ class SqlComposite {
 		public void placeholder(Consumer<Placeholder> consumer) {}
 
 		@Override
-		public Component complement(Map<String, Object> map) {
+		public Component bind(Map<String, Object> values) {
 			return this;
 		}
 
@@ -128,8 +134,20 @@ class SqlComposite {
 		}
 
 		@Override
-		public Component complement(Map<String, Object> map) {
-			throw new UnsupportedOperationException();
+		public Component bind(Map<String, Object> values) {
+			//キーが存在しない場合、値の更新はないものとして自身を返す
+			if (!values.containsKey(name)) {
+				return this;
+			}
+
+			var value = values.get(name);
+			return new Placeholder(
+				name,
+				confidential,
+				new SecureString(type.placeholderExpression(value)),
+				original,
+				type,
+				value);
 		}
 
 		@Override
@@ -171,8 +189,8 @@ class SqlComposite {
 		}
 
 		@Override
-		public Component complement(Map<String, Object> map) {
-			var value = map.get(name);
+		public Component bind(Map<String, Object> values) {
+			var value = values.get(name);
 			return new Placeholder(
 				name,
 				confidential,

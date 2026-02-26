@@ -804,6 +804,21 @@ public class Atom<T> {
 	}
 
 	/**
+	 * {@link Atom}が内部で持つバインドされた値を新たに再バインドし、新しいインスタンスとして返します。<br>
+	 * valuesに存在しないプレースホルダ名の値は既存の値が使用されます。<br>
+	 * 値にnullを使用したい場合はキーがプレースホルダ名、値がnullとしてください。
+	 * @param values キーはプレースホルダ名、値は再バインドする値
+	 * @return 新たに作成された{@link Atom}
+	 */
+	public Atom<T> rebind(Map<String, Object> values) {
+		return new Atom<T>(
+			atomSql,
+			helper,
+			SqlComposite.rebind(sqlComposite(), Objects.requireNonNull(values)),
+			andType);
+	}
+
+	/**
 	 * 内部に持つSQL文の一部同士を" "をはさんで文字列結合します。<br>
 	 * このインスタンス及びもう一方の内部SQLは変化せず、結合された新たな{@link Atom}が返されます。<br>
 	 * 複数を一度に結合することが可能です。
