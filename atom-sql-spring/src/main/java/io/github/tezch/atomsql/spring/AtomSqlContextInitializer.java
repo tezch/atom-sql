@@ -17,6 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import io.github.tezch.atomsql.AtomSql;
 import io.github.tezch.atomsql.AtomSqlUtils;
 import io.github.tezch.atomsql.Configure;
+import io.github.tezch.atomsql.Constants;
 import io.github.tezch.atomsql.Endpoint;
 import io.github.tezch.atomsql.Endpoints;
 import io.github.tezch.atomsql.SimpleConfigure;
@@ -88,7 +89,10 @@ public class AtomSqlContextInitializer implements ApplicationContextInitializer<
 
 		var batchThreshold = environment.getProperty("atomsql.batch-threshold", Integer.class, 0);
 
-		var cacheCapacity = environment.getProperty("atomsql.cache-capacity", Integer.class, 1000);
+		var cacheCapacity = environment.getProperty(
+			"atomsql.cache-capacity",
+			Integer.class,
+			Constants.DEFAULT_CACHE_SIZE);
 
 		return new SimpleConfigure(
 			enableLog,

@@ -1,6 +1,7 @@
 package io.github.tezch.atomsql;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
 import java.lang.annotation.Annotation;
@@ -18,13 +19,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -325,28 +326,13 @@ public class AtomSql {
 		}
 	}
 
-	@SuppressWarnings("serial")
-	private static class Cache extends LinkedHashMap<Method, Helpers> {
+	private final int capacity = configure().cacheCapacity();
 
-		private final int capacity;
+	private final ConcurrentHashMap<Method, Helpers> cache = cache();
 
-		public Cache(int capacity) {
-			super(0, 0.75f, true);
-			this.capacity = capacity;
-		}
-
-		@Override
-		protected boolean removeEldestEntry(Map.Entry<Method, Helpers> eldest) {
-			return size() > capacity;
-		}
+	private ConcurrentHashMap<Method, Helpers> cache() {
+		return capacity > 0 ? new ConcurrentHashMap<>() : null;
 	}
-
-	private static Cache cache() {
-		var capacity = configure().cacheCapacity();
-		return capacity > 0 ? new Cache(capacity) : null;
-	}
-
-	private final Cache cache = cache();
 
 	private Object invokeMethod(Object proxy, Method method, Object[] args) throws Throwable {
 		if (method.isDefault()) return InvocationHandler.invokeDefault(proxy, method, args);
@@ -377,7 +363,7 @@ public class AtomSql {
 		var parameterBinderClass = metadata.parameterBinder();
 
 		// ParameterBinderを使用している場合、同じ処理を二度しないためスキャンした内容をhelper作成に引き渡す
-		Optional<ParameterBinderInfo> parameterBinderInfo = Optional.empty();
+		Optional<ParameterBinderInfo> parameterBinderInfo;
 		Object[] computedValues;
 		if (!parameterBinderClass.equals(Object.class)) {
 			var parameterBinder = parameterBinderClass.getConstructor().newInstance();
@@ -404,21 +390,37 @@ public class AtomSql {
 			parameterBinderInfo = Optional.of(new ParameterBinderInfo(fields, values));
 		} else {
 			computedValues = args;
+
+			parameterBinderInfo = Optional.empty();
 		}
 
 		Helpers helpers;
 		if (cache == null) {//キャッシュを利用しない設定の場合
 			helpers = helpers(proxyInterface, method, metadata, parameterBinderInfo).helpers;
 		} else {
-			synchronized (cache) {
-				helpers = cache.get(method);
+			Helpers[] helpersHolder = { null };
+			helpers = cache.computeIfAbsent(method, m -> {
+				var result = helpers(proxyInterface, method, metadata, parameterBinderInfo);
 
-				if (helpers == null) {
-					var result = helpers(proxyInterface, method, metadata, parameterBinderInfo);
+				//キャッシュするにしてもしなくてもここで回収
+				helpersHolder[0] = result.helpers;
 
-					if (result.canCache) cache.put(method, result.helpers);
+				//キャッシュに登録しない
+				if (!result.canCache) return null;
 
-					helpers = result.helpers;
+				//キャッシュに登録
+				return result.helpers;
+			});
+
+			if (helpers == null)
+				helpers = helpersHolder[0];
+
+			if (cache.size() > capacity) {
+				//適当に1件削除
+				var it = cache.keySet().iterator();
+				if (it.hasNext()) {
+					it.next();
+					it.remove();
 				}
 			}
 		}
@@ -453,8 +455,7 @@ public class AtomSql {
 		Class<?> proxyInterface,
 		Method method,
 		io.github.tezch.atomsql.annotation.processor.Method metadata,
-		Optional<ParameterBinderInfo> parameterBinderInfo)
-		throws Throwable {
+		Optional<ParameterBinderInfo> parameterBinderInfo) {
 		var parameterNames = metadata.parameters();
 
 		var confidentialSql = method.getAnnotation(ConfidentialSql.class);
@@ -488,7 +489,12 @@ public class AtomSql {
 				});
 		}
 
-		var sql = loadSql(proxyInterface, method);
+		SecureString sql;
+		try {
+			sql = loadSql(proxyInterface, method);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
 
 		var conf = configure();
 

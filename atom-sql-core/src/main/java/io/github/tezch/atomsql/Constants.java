@@ -42,4 +42,9 @@ public interface Constants {
 	 * {@link ConfidentialSql}が付与されたSQL文のログ上の目印
 	 */
 	public static final String CONFIDENTIAL = "<<CONFIDENTIAL>>";
+
+	/**
+	 * {@link AtomSql}のキャッシュ最大値のデフォルト
+	 */
+	public static final int DEFAULT_CACHE_SIZE = 5000;
 }

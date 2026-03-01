@@ -19,13 +19,14 @@ class AtomSqlInitializer {
 	}
 
 	/**
-	 * 
+	 * initialize
 	 */
 	static void initialize() {
 		initialize(new PropertiesConfigure());
 	}
 
 	/**
+	 * initializeIfUninitialized
 	 * @param config 
 	 */
 	synchronized static void initializeIfUninitialized(Configure config) {
@@ -34,7 +35,7 @@ class AtomSqlInitializer {
 	}
 
 	/**
-	 * 
+	 * initializeIfUninitialized
 	 */
 	synchronized static void initializeIfUninitialized() {
 		if (staticConfig != null) return;
