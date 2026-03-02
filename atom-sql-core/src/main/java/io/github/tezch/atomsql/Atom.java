@@ -1080,8 +1080,11 @@ public class Atom<T> {
 							|| elementString.contains("<generated>"))
 							continue;
 
-						if (AtomSql.configure().logStackTracePattern().matcher(elementString).find())
-							logger.log(Level.INFO, " " + elementString);
+						atomSql.logStacktracePattern.ifPresent(p -> {
+							if (p.matcher(elementString).find()) {
+								logger.log(Level.INFO, " " + elementString);
+							}
+						});
 					}
 
 					var placeholders = sql.placeholders();

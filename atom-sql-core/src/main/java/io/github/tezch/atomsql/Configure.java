@@ -1,7 +1,5 @@
 package io.github.tezch.atomsql;
 
-import java.util.regex.Pattern;
-
 import io.github.tezch.atomsql.annotation.NoSqlLog;
 import io.github.tezch.atomsql.annotation.Qualifier;
 
@@ -25,7 +23,7 @@ public interface Configure {
 	 * パターンにマッチしたものがログに出力される
 	 * @return フィルタパターン
 	 */
-	Pattern logStackTracePattern();
+	String logStacktracePattern();
 
 	/**
 	 * should-ignore-no-sql-log<br>

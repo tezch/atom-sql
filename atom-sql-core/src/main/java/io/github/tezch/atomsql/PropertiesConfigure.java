@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.regex.Pattern;
 
 import io.github.tezch.atomsql.annotation.NoSqlLog;
 import io.github.tezch.atomsql.annotation.Qualifier;
@@ -29,7 +28,7 @@ public class PropertiesConfigure implements Configure {
 	 * SQLログに含まれる呼び出し元情報のフィルタパターン（正規表現）<br>
 	 * パターンにマッチしたものがログに出力される
 	 */
-	private final Pattern logStackTracePattern;
+	private final String logStackTracePattern;
 
 	/**
 	 * should-ignore-no-sql-log<br>
@@ -81,7 +80,7 @@ public class PropertiesConfigure implements Configure {
 
 		enableLog = Boolean.valueOf(config.getProperty("enable-log", "false"));
 
-		logStackTracePattern = Pattern.compile(config.getProperty("log-stacktrace-pattern", ".+"));
+		logStackTracePattern = config.getProperty("log-stacktrace-pattern", ".+");
 
 		shouldIgnoreNoSqlLog = Boolean.valueOf(config.getProperty("should-ignore-no-sql-log", "false"));
 
@@ -91,9 +90,8 @@ public class PropertiesConfigure implements Configure {
 
 		batchThreshold = Integer.parseInt(config.getProperty("batch-threshold", "0"));
 
-		cacheCapacity = Optional.ofNullable(config.getProperty("cache-capacity"))
-			.map(Integer::parseInt)
-			.orElse(Constants.DEFAULT_CACHE_SIZE);
+		cacheCapacity = Integer.parseInt(
+			Optional.ofNullable(config.getProperty("cache-capacity")).orElse(Constants.DEFAULT_CACHE_SIZE));
 	}
 
 	@Override
@@ -102,7 +100,7 @@ public class PropertiesConfigure implements Configure {
 	}
 
 	@Override
-	public Pattern logStackTracePattern() {
+	public String logStacktracePattern() {
 		return logStackTracePattern;
 	}
 

@@ -1,7 +1,5 @@
 package io.github.tezch.atomsql;
 
-import java.util.regex.Pattern;
-
 import io.github.tezch.atomsql.annotation.NoSqlLog;
 import io.github.tezch.atomsql.annotation.Qualifier;
 
@@ -9,7 +7,7 @@ import io.github.tezch.atomsql.annotation.Qualifier;
  * Atom SQL用の設定を保持するレコードです。
  * @author tezch
  * @param enableLog SQLログを出力するかどうか
- * @param logStackTracePattern SQLログに含まれる呼び出し元情報のフィルタパターン（正規表現）
+ * @param logStacktracePattern SQLログに含まれる呼び出し元情報のフィルタパターン（正規表現）
  * @param shouldIgnoreNoSqlLog アノテーション{@link NoSqlLog}が付与されていても、それを無視してSQLログを出力するかどうか
  * @param usesQualifier {@link Qualifier}を使用するかどうか
  * @param typeFactoryClass {@link AtomSqlTypeFactory}
@@ -18,7 +16,7 @@ import io.github.tezch.atomsql.annotation.Qualifier;
  */
 public record SimpleConfigure(
 	boolean enableLog,
-	Pattern logStackTracePattern,
+	String logStacktracePattern,
 	boolean shouldIgnoreNoSqlLog,
 	boolean usesQualifier,
 	String typeFactoryClass,

@@ -46,5 +46,5 @@ public interface Constants {
 	/**
 	 * {@link AtomSql}のキャッシュ最大値のデフォルト
 	 */
-	public static final int DEFAULT_CACHE_SIZE = 5000;
+	public static final String DEFAULT_CACHE_SIZE = "5000";
 }

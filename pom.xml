@@ -17,6 +17,7 @@
 		<module>atom-sql-core</module>
 		<module>atom-sql-processor</module>
 		<module>atom-sql-spring</module>
+		<module>atom-sql-spring-boot-starter</module>
 	</modules>
 
 	<licenses>
@@ -48,16 +49,6 @@
 		<maven.compiler.release>17</maven.compiler.release>
 		<gpg.skip>true</gpg.skip>
 	</properties>
-
-	<dependencyManagement>
-		<dependencies>
-			<dependency>
-				<groupId>io.github.tezch</groupId>
-				<artifactId>atom-sql-core</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-		</dependencies>
-	</dependencyManagement>
 
 	<build>
 		<plugins>

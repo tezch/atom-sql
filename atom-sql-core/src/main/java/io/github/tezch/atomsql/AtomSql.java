@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -110,6 +111,8 @@ public class AtomSql {
 	private final ThreadLocal<List<Stream<?>>> streams = new ThreadLocal<>();
 
 	private final Endpoints endpoints;
+
+	final Optional<Pattern> logStacktracePattern;
 
 	class BatchResources {
 
@@ -201,6 +204,7 @@ public class AtomSql {
 			Thread.currentThread().getContextClassLoader());
 		sqlLogger = SqlLogger.instance();
 		this.endpoints = Objects.requireNonNull(endpoints);
+		logStacktracePattern = logStacktracePattern(configure());
 	}
 
 	/**
@@ -213,11 +217,14 @@ public class AtomSql {
 		typeFactory = base.typeFactory;
 		sqlLogger = base.sqlLogger;
 		this.endpoints = base.endpoints;
+		logStacktracePattern = logStacktracePattern(configure());
 	}
 
 	AtomSql() {
+		var configure = configure();
+
 		typeFactory = AtomSqlTypeFactory.newInstance(
-			configure().typeFactoryClass(),
+			configure.typeFactoryClass(),
 			Thread.currentThread().getContextClassLoader());
 		sqlLogger = SqlLogger.instance();
 
@@ -267,6 +274,16 @@ public class AtomSql {
 				throw new UnsupportedOperationException();
 			}
 		});
+
+		logStacktracePattern = logStacktracePattern(configure);
+	}
+
+	private static Optional<Pattern> logStacktracePattern(Configure configure) {
+		if (configure.enableLog()) {
+			return Optional.of(Pattern.compile(configure.logStacktracePattern()));
+		}
+
+		return Optional.empty();
 	}
 
 	/**
