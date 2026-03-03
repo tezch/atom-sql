@@ -814,7 +814,7 @@ public class Atom<T> {
 		return new Atom<T>(
 			atomSql,
 			helper,
-			SqlComposite.rebind(sqlComposite(), Objects.requireNonNull(values)),
+			SqlComposite.rebind(sqlComposite(), Objects.requireNonNull(values), helper.typeFactory()),
 			andType);
 	}
 

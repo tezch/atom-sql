@@ -45,7 +45,6 @@ import io.github.tezch.atomsql.annotation.Sql;
 import io.github.tezch.atomsql.annotation.SqlFile;
 import io.github.tezch.atomsql.annotation.SqlProxy;
 import io.github.tezch.atomsql.annotation.processor.Methods;
-import io.github.tezch.atomsql.type.NULL;
 
 /**
  * Atom SQLの実行時の処理のほとんどを行うコアクラスです。<br>
@@ -413,24 +412,9 @@ public class AtomSql {
 
 		Helpers helpers;
 		if (cache == null) {//キャッシュを利用しない設定の場合
-			helpers = helpers(proxyInterface, method, metadata, parameterBinderInfo).helpers;
+			helpers = helpers(proxyInterface, method, metadata, parameterBinderInfo);
 		} else {
-			Helpers[] helpersHolder = { null };
-			helpers = cache.computeIfAbsent(method, m -> {
-				var result = helpers(proxyInterface, method, metadata, parameterBinderInfo);
-
-				//キャッシュするにしてもしなくてもここで回収
-				helpersHolder[0] = result.helpers;
-
-				//キャッシュに登録しない
-				if (!result.canCache) return null;
-
-				//キャッシュに登録
-				return result.helpers;
-			});
-
-			if (helpers == null)
-				helpers = helpersHolder[0];
+			helpers = cache.computeIfAbsent(method, m -> helpers(proxyInterface, method, metadata, parameterBinderInfo));
 
 			if (cache.size() > capacity) {
 				//適当に1件削除
@@ -445,7 +429,7 @@ public class AtomSql {
 		var atom = new Atom<Object>(
 			AtomSql.this,
 			helpers.sqlProxyHelper,
-			SqlComposite.createSqlComposite(helpers.sqlCompositeHelper, computedValues),
+			SqlComposite.createSqlComposite(helpers.sqlCompositeHelper, computedValues, typeFactory),
 			true);
 
 		if (returnType.equals(Atom.class)) {
@@ -468,7 +452,7 @@ public class AtomSql {
 
 	private static record ParameterBinderInfo(List<Field> fields, List<Object> values) {}
 
-	private HelpersResult helpers(
+	private Helpers helpers(
 		Class<?> proxyInterface,
 		Method method,
 		io.github.tezch.atomsql.annotation.processor.Method metadata,
@@ -573,8 +557,6 @@ public class AtomSql {
 			}
 		};
 
-		boolean[] canCache = { true };
-
 		SqlCompositeHelper sqlCompositeHelper;
 		if (parameterBinderInfo.isPresent()) {
 			var info = parameterBinderInfo.get();
@@ -585,27 +567,12 @@ public class AtomSql {
 			var size = info.fields.size();
 			for (int i = 0; i < size; i++) {
 				var field = info.fields.get(i);
-				var value = info.values.get(i);
 
 				var name = field.getName();
 
 				names.add(name);
 
-				var t = field.getType();
-				if (t.equals(Object.class)) {
-					// 型がObjectの場合、実際の値を見てPreparedStatementのsetメソッドを決定せざるを得ないので毎回判定が必要
-					// そのためキャッシュさせない
-					canCache[0] = false;
-
-					if (value == null) {
-						//値がnullの場合、仕方がないのでPreparedStatementにnullを設定できるようにNULLをセットする
-						types.add(NULL.instance);
-					} else {
-						types.add(typeFactory.select(value.getClass()));
-					}
-				} else {
-					types.add(typeFactory.select(field.getType()));
-				}
+				types.add(typeFactory.select(field.getType()));
 			}
 
 			var fieldNames = names.toArray(String[]::new);
@@ -637,10 +604,8 @@ public class AtomSql {
 			mySqlLogger,
 			snapshot);
 
-		return new HelpersResult(new Helpers(sqlProxyHelper, sqlCompositeHelper), canCache[0]);
+		return new Helpers(sqlProxyHelper, sqlCompositeHelper);
 	}
-
-	private static record HelpersResult(Helpers helpers, boolean canCache) {}
 
 	private static record Helpers(SqlProxyHelper sqlProxyHelper, SqlCompositeHelper sqlCompositeHelper) {}
 
@@ -921,7 +886,8 @@ public class AtomSql {
 				emptyStringArray,
 				emptyAtomSqlTypeArray,
 				false),
-			emptyObjectArray);
+			emptyObjectArray,
+			typeFactory);
 	}
 
 	static record SqlProxyHelper(

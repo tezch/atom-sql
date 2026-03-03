@@ -229,8 +229,7 @@ public interface AtomSqlType {
 	AtomSqlType toTypeArgument();
 
 	/**
-	 * この型がスレッドセーフではないかを返します。<br>
-	 * {@link CSV}等、実際の値を用いて判断するタイプのために実際に使用される値が提供されます。
+	 * この型がスレッドセーフではないかを返します。
 	 * @return nonThreadSafeの場合、true
 	 */
 	default boolean nonThreadSafe() {

@@ -1,6 +1,7 @@
 target/
 .classpath
 .project
+.factorypath
 **/.settings/*
 
 !**/.settings/org.eclipse.core.resources.prefs

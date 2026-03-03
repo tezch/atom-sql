@@ -8,6 +8,10 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
+import io.github.tezch.atomsql.type.CSV;
+import io.github.tezch.atomsql.type.NULL;
+import io.github.tezch.atomsql.type.OBJECT;
+
 class SqlComposite {
 
 	static final SqlComposite EMPTY = new SqlComposite(new SecureString(""));
@@ -30,21 +34,36 @@ class SqlComposite {
 		}
 	}
 
-	static SqlComposite createSqlComposite(SqlCompositeHelper helper, Object[] args) {
+	static SqlComposite createSqlComposite(
+		SqlCompositeHelper helper,
+		Object[] args,
+		AtomSqlTypeFactory typeFactory) {
 		Map<String, Object> map = new HashMap<>();
 		for (int i = 0; i < helper.parameterNames.length; i++) {
 			map.put(helper.parameterNames[i], args[i]);
 		}
 
-		List<Component> components = helper.prototypes.stream().map(p -> p.bind(map)).toList();
+		List<Component> components = helper.prototypes.stream().map(p -> p.bind(map, typeFactory)).toList();
 
-		return new SqlComposite(components, helper.containsNonThreadSafeValue);
+		boolean containsNonThreadSafeValue = helper.containsNonThreadSafeValue;
+		if (containsNonThreadSafeValue) {
+			//processor処理時にnonThreadSafeと判定されている場合、今回の値を使って再度nonThreadSafe確認
+			containsNonThreadSafeValue = components.stream()
+				.filter(c -> c.nonThreadSafeValue(typeFactory))
+				.findFirst()
+				.isPresent();
+		}
+
+		return new SqlComposite(components, containsNonThreadSafeValue);
 	}
 
-	static SqlComposite rebind(SqlComposite base, Map<String, Object> values) {
-		List<Component> components = base.components.stream().map(p -> p.bind(values)).toList();
+	static SqlComposite rebind(SqlComposite base, Map<String, Object> values, AtomSqlTypeFactory typeFactory) {
+		List<Component> components = base.components.stream().map(p -> p.bind(values, typeFactory)).toList();
 
-		return new SqlComposite(components, base.containsNonThreadSafeValue);
+		return new SqlComposite(
+			components,
+			//値を取り込みなおしてnonThreadSafe確認
+			components.stream().filter(c -> c.nonThreadSafeValue(typeFactory)).findFirst().isPresent());
 	}
 
 	static interface Component {
@@ -53,11 +72,13 @@ class SqlComposite {
 
 		void placeholder(Consumer<Placeholder> consumer);
 
-		Component bind(Map<String, Object> values);
+		Component bind(Map<String, Object> values, AtomSqlTypeFactory typeFactory);
 
 		void appendTo(StringBuilder builder);
 
 		void appendOriginalTo(StringBuilder builder);
+
+		boolean nonThreadSafeValue(AtomSqlTypeFactory typeFactory);
 
 		boolean isEmpty();
 
@@ -89,7 +110,7 @@ class SqlComposite {
 		public void placeholder(Consumer<Placeholder> consumer) {}
 
 		@Override
-		public Component bind(Map<String, Object> values) {
+		public Component bind(Map<String, Object> values, AtomSqlTypeFactory typeFactory) {
 			return this;
 		}
 
@@ -101,6 +122,11 @@ class SqlComposite {
 		@Override
 		public void appendOriginalTo(StringBuilder builder) {
 			builder.append(text);
+		}
+
+		@Override
+		public boolean nonThreadSafeValue(AtomSqlTypeFactory typeFactory) {
+			return false;
 		}
 
 		@Override
@@ -119,7 +145,8 @@ class SqlComposite {
 		boolean confidential,
 		SecureString expression, //置換後のプレースホルダ
 		String original, //元のプレースホルダ文字列全体（型ヒントを含む）
-		AtomSqlType type, //型
+		AtomSqlType type, //Object型の場合、実際の値から判定した型
+		AtomSqlType staticType, //元々指定された型
 		Object value //値
 	) implements Component {
 
@@ -134,7 +161,7 @@ class SqlComposite {
 		}
 
 		@Override
-		public Component bind(Map<String, Object> values) {
+		public Component bind(Map<String, Object> values, AtomSqlTypeFactory typeFactory) {
 			//キーが存在しない場合、値の更新はないものとして自身を返す
 			if (!values.containsKey(name)) {
 				return this;
@@ -146,7 +173,8 @@ class SqlComposite {
 				confidential,
 				new SecureString(type.placeholderExpression(value)),
 				original,
-				type,
+				computeType(staticType, value, typeFactory),
+				staticType,
 				value);
 		}
 
@@ -158,6 +186,11 @@ class SqlComposite {
 		@Override
 		public void appendOriginalTo(StringBuilder builder) {
 			builder.append(original);
+		}
+
+		@Override
+		public boolean nonThreadSafeValue(AtomSqlTypeFactory typeFactory) {
+			return CSV.tryNonThreadSafe(value, typeFactory, () -> type.nonThreadSafe());
 		}
 
 		@Override
@@ -189,13 +222,15 @@ class SqlComposite {
 		}
 
 		@Override
-		public Component bind(Map<String, Object> values) {
+		public Component bind(Map<String, Object> values, AtomSqlTypeFactory typeFactory) {
 			var value = values.get(name);
+
 			return new Placeholder(
 				name,
 				confidential,
 				new SecureString(type.placeholderExpression(value)),
 				original,
+				computeType(type, value, typeFactory),
 				type,
 				value);
 		}
@@ -211,6 +246,11 @@ class SqlComposite {
 		}
 
 		@Override
+		public boolean nonThreadSafeValue(AtomSqlTypeFactory typeFactory) {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
 		public boolean isEmpty() {
 			throw new UnsupportedOperationException();
 		}
@@ -219,6 +259,15 @@ class SqlComposite {
 		public boolean isBlank() {
 			throw new UnsupportedOperationException();
 		}
+	}
+
+	private static AtomSqlType computeType(AtomSqlType type, Object value, AtomSqlTypeFactory typeFactory) {
+		if (type != OBJECT.instance) return type;
+
+		//型がOBJECTの場合
+		//値がnullの場合、仕方がないのでPreparedStatementにnullを設定できるようにNULLをセットする
+		//nullでなければ値から型を判定
+		return value == null ? NULL.instance : typeFactory.select(value.getClass());
 	}
 
 	final boolean containsNonThreadSafeValue;
