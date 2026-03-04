@@ -168,12 +168,15 @@ class SqlComposite {
 			}
 
 			var value = values.get(name);
+
+			var computedType = computeType(staticType, value, typeFactory);
+
 			return new Placeholder(
 				name,
 				confidential,
-				new SecureString(type.placeholderExpression(value)),
+				new SecureString(computedType.placeholderExpression(value)),
 				original,
-				computeType(staticType, value, typeFactory),
+				computedType,
 				staticType,
 				value);
 		}
@@ -225,12 +228,14 @@ class SqlComposite {
 		public Component bind(Map<String, Object> values, AtomSqlTypeFactory typeFactory) {
 			var value = values.get(name);
 
+			var computedType = computeType(type, value, typeFactory);
+
 			return new Placeholder(
 				name,
 				confidential,
-				new SecureString(type.placeholderExpression(value)),
+				new SecureString(computedType.placeholderExpression(value)),
 				original,
-				computeType(type, value, typeFactory),
+				computedType,
 				type,
 				value);
 		}
