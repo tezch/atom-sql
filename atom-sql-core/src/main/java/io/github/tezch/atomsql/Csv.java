@@ -1,5 +1,6 @@
 package io.github.tezch.atomsql;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -53,7 +54,8 @@ public class Csv<T> {
 		//値は空であってはなりません
 		if (values.size() == 0) throw new IllegalArgumentException("Values must not be empty");
 
-		this.values = Collections.unmodifiableList(values);
+		//List.copyOfではnullが許容されないのでunmodifiableListを使用する
+		this.values = Collections.unmodifiableList(new ArrayList<>(values));
 	}
 
 	/**

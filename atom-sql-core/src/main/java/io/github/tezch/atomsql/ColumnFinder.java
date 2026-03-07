@@ -17,7 +17,8 @@ public class ColumnFinder {
 
 	private static final Pattern pattern = Pattern.compile(
 		//:placeholderを排除するため、あえて:を含める
-		"([^\\s[\\p{Punct}&&[^_:]]]+)(/\\*([^\\\\*<]+)(?:<([^\\\\*>]+)>|)\\*/)",
+		//カラム名が""で囲まれていてもマッチさせる
+		"([^\\s[\\p{Punct}&&[^_:]]]+)(\"?)(/\\*([^\\\\*<]+)(?:<([^\\\\*>]+)>|)\\*/)",
 		Pattern.CASE_INSENSITIVE);
 
 	/**
@@ -30,6 +31,7 @@ public class ColumnFinder {
 		list.add(execute(sql, f -> {
 			list.add(f.gap);
 			list.add(f.column);
+			list.add(f.doubleQuote);
 		}));
 
 		return String.join("", list);
@@ -72,9 +74,11 @@ public class ColumnFinder {
 
 			found.column = matched;
 
-			found.typeHint = matcher.group(3);
+			found.doubleQuote = matcher.group(2);
 
-			found.typeArgumentHint = Optional.ofNullable(matcher.group(4));
+			found.typeHint = matcher.group(4);
+
+			found.typeArgumentHint = Optional.ofNullable(matcher.group(5));
 
 			placeholderConsumer.accept(found);
 		}
@@ -93,6 +97,8 @@ public class ColumnFinder {
 		public String gap;
 
 		public String column;
+
+		public String doubleQuote;
 
 		public String typeHint;
 
