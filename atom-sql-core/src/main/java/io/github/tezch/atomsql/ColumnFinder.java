@@ -21,22 +21,6 @@ public class ColumnFinder {
 		"([^\\s[\\p{Punct}&&[^_:]]]+)(\"?)(/\\*([^\\\\*<]+)(?:<([^\\\\*>]+)>|)\\*/)",
 		Pattern.CASE_INSENSITIVE);
 
-	/**
-	 * SQLからカラムの型ヒントを除去します。
-	 * @param sql 元のSQL
-	 * @return 型ヒント除去後のSQL
-	 */
-	static String normalize(String sql) {
-		var list = new LinkedList<String>();
-		list.add(execute(sql, f -> {
-			list.add(f.gap);
-			list.add(f.column);
-			list.add(f.doubleQuote);
-		}));
-
-		return String.join("", list);
-	}
-
 	public static String execute(String sql, Consumer<Found> placeholderConsumer) {
 		//誤検出分保管
 		List<String> pseudoMatches = new LinkedList<>();

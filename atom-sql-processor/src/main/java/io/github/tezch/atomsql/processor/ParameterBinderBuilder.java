@@ -14,6 +14,7 @@ import javax.lang.model.element.VariableElement;
 
 import io.github.tezch.atomsql.Constants;
 import io.github.tezch.atomsql.PlaceholderFinder;
+import io.github.tezch.atomsql.SqlMasker;
 import io.github.tezch.atomsql.type.OBJECT;
 
 class ParameterBinderBuilder extends HelperBuilder {
@@ -75,7 +76,7 @@ class ParameterBinderBuilder extends HelperBuilder {
 
 		boolean[] nonThreadSafe = { false };
 
-		PlaceholderFinder.execute(sql, f -> {
+		PlaceholderFinder.execute(new SqlMasker().mask(sql), f -> {
 			//重複は除外
 			if (dubplicateChecker.contains(f.placeholder)) return;
 

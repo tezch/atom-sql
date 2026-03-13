@@ -16,6 +16,7 @@ import io.github.tezch.atomsql.Atom;
 import io.github.tezch.atomsql.ColumnFinder;
 import io.github.tezch.atomsql.Constants;
 import io.github.tezch.atomsql.Protoatom;
+import io.github.tezch.atomsql.SqlMasker;
 import io.github.tezch.atomsql.annotation.DataObject;
 import io.github.tezch.atomsql.processor.MethodExtractor.Result;
 import io.github.tezch.atomsql.type.OBJECT;
@@ -75,7 +76,7 @@ class DataObjectBuilder extends SourceBuilder {
 	private void columns(String sql, List<Column> columns, List<String> enumValidators, ExecutableElement method) {
 		var dubplicateChecker = new HashSet<String>();
 
-		ColumnFinder.execute(sql, f -> {
+		ColumnFinder.execute(new SqlMasker().mask(sql), f -> {
 			var column = f.column;
 			//重複は除外
 			if (dubplicateChecker.contains(column)) return;

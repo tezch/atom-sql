@@ -609,6 +609,21 @@ public class AtomSql {
 
 	private static record Helpers(SqlProxyHelper sqlProxyHelper, SqlCompositeHelper sqlCompositeHelper) {}
 
+	/**
+	 * SQLからカラムの型ヒントを除去
+	 * @param maskedSql 元のSQL({@link SqlMasker}でマスク済みであること)
+	 */
+	private static String normalize(String maskedSql) {
+		var list = new LinkedList<String>();
+		list.add(ColumnFinder.execute(maskedSql, f -> {
+			list.add(f.gap);
+			list.add(f.column);
+			list.add(f.doubleQuote);
+		}));
+
+		return String.join("", list);
+	}
+
 	private static SqlCompositeHelper sqlCompositeHelper(
 		SecureString secureSql,
 		Set<String> confidentials,
@@ -620,12 +635,16 @@ public class AtomSql {
 			map.put(parameterNames[i], parameterTypes[i]);
 		}
 
+		var masker = new SqlMasker();
+
+		var maskedSql = masker.mask(secureSql.toString());
+
 		List<Component> components = new ArrayList<>();
 
-		var sql = ColumnFinder.normalize(secureSql.toString());
+		maskedSql = normalize(maskedSql);
 
-		var sqlRemain = PlaceholderFinder.execute(sql, f -> {
-			components.add(new Text(new SecureString(f.gap)));
+		var sqlRemain = PlaceholderFinder.execute(maskedSql, f -> {
+			components.add(new Text(new SecureString(masker.unmask(f.gap))));
 
 			if (!map.containsKey(f.placeholder))
 				throw new PlaceholderNotFoundException(f.placeholder);
@@ -638,7 +657,7 @@ public class AtomSql {
 					map.get(f.placeholder)));
 		});
 
-		components.add(new Text(new SecureString(sqlRemain)));
+		components.add(new Text(new SecureString(masker.unmask(sqlRemain))));
 
 		return new SqlCompositeHelper(components, parameterNames, containsNonThreadSafeValue);
 	}

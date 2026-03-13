@@ -89,21 +89,26 @@ class SqlComposite {
 
 		@Override
 		public void replaceAndAdd(Pattern pattern, SqlComposite another, List<Component> components) {
-			String remain = text.toString();
+			var masker = new SqlMasker();
+
+			String remain = masker.mask(text.toString());
 			while (true) {
 				var matcher = pattern.matcher(remain);
 
 				if (!matcher.find())
 					break;
 
-				components.add(new Text(new SecureString(remain.substring(0, matcher.start()))));
+				components.add(
+					new Text(
+						new SecureString(
+							masker.unmask(remain.substring(0, matcher.start())))));
 
 				remain = remain.substring(matcher.end());
 
 				components.addAll(another.components);
 			}
 
-			components.add(new Text(new SecureString(remain)));
+			components.add(new Text(new SecureString(masker.unmask(remain))));
 		}
 
 		@Override

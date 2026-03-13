@@ -42,6 +42,7 @@ import io.github.tezch.atomsql.Constants;
 import io.github.tezch.atomsql.Csv;
 import io.github.tezch.atomsql.PlaceholderFinder;
 import io.github.tezch.atomsql.Protoatom;
+import io.github.tezch.atomsql.SqlMasker;
 import io.github.tezch.atomsql.annotation.DataObject;
 import io.github.tezch.atomsql.annotation.SqlProxy;
 import io.github.tezch.atomsql.processor.MetadataBuilder.MethodInfo;
@@ -502,10 +503,12 @@ class SqlProxyProcessor {
 				return DEFAULT_VALUE;
 			}
 
+			var maskedSql = new SqlMasker().mask(result.sql);
+
 			if (info.parameterBinder == null) {
 				//通常のメソッド引数が存在するので検査対象
 				Set<String> placeholders = new TreeSet<>();
-				PlaceholderFinder.execute(result.sql, f -> {
+				PlaceholderFinder.execute(maskedSql, f -> {
 					placeholders.add(f.placeholder);
 				});
 
@@ -520,7 +523,7 @@ class SqlProxyProcessor {
 			}
 
 			var columns = new LinkedList<Found>();
-			ColumnFinder.execute(result.sql, columns::add);
+			ColumnFinder.execute(maskedSql, columns::add);
 
 			var returnTypeChecker = new ReturnTypeChecker(!columns.isEmpty());
 
