@@ -7,7 +7,6 @@ import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.TypeElement;
 
@@ -23,7 +22,6 @@ import io.github.tezch.atomsql.annotation.SqlProxy;
 	"io.github.tezch.atomsql.annotation.SqlProxy",
 	"io.github.tezch.atomsql.annotation.DataObject",
 })
-@SupportedSourceVersion(SourceVersion.RELEASE_17)
 public class AtomSqlProcessor extends AbstractProcessor {
 
 	static {
@@ -41,6 +39,11 @@ public class AtomSqlProcessor extends AbstractProcessor {
 		Supplier<ProcessingEnvironment> supplier = () -> processingEnv;
 		sqlProxyAnnotationProcessor = new SqlProxyProcessor(supplier);
 		dataObjectAnnotationProcessor = new DataObjectProcessor(supplier);
+	}
+
+	@Override
+	public SourceVersion getSupportedSourceVersion() {
+		return SourceVersion.latestSupported();
 	}
 
 	@Override

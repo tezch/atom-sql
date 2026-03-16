@@ -102,12 +102,17 @@ abstract class SourceBuilder {
 		}
 	}
 
-	void execute(ExecutableElement method) {
+	/**
+	 * ソースファイルの作成を実施
+	 * @param method
+	 * @return 実際に作成された場合、true
+	 */
+	boolean execute(ExecutableElement method) {
 		var result = extractTargetElement(method);
 
-		if (!result.success) return;
+		if (!result.success) return false;
 
-		execute(method, result.targetType);
+		return execute(method, result.targetType);
 	}
 
 	abstract ExtractResult extractTargetElement(ExecutableElement method);
@@ -119,7 +124,7 @@ abstract class SourceBuilder {
 
 	abstract String source(String generateClassName, ExecutableElement method, Result result);
 
-	private void execute(ExecutableElement method, Element targetType) {
+	private boolean execute(ExecutableElement method, Element targetType) {
 		String generatePackageName;
 		String generateClassName;
 		{
@@ -136,7 +141,7 @@ abstract class SourceBuilder {
 			result = extractor.execute(method);
 		} catch (SqlNotFoundException | SqlFileNotFoundException ex) {
 			error(ex.getMessage(), method);
-			return;
+			return false;
 		}
 
 		var className = result.className;
@@ -152,12 +157,12 @@ abstract class SourceBuilder {
 		if (info != null && (!info.enclosingClass.equals(className) || !info.method.equals(methodSignature))) {
 			//generateClassNameという名前は既に他で使われています
 			error("The name [" + generateClassName + "] has already been used elsewhere", method);
-			return;
+			return false;
 		}
 
 		checker.put(newClassName, new MethodInfo(newClassName, className, methodSignature));
 
-		if (alreadyCreatedFiles.contains(newClassName)) return;
+		if (alreadyCreatedFiles.contains(newClassName)) return false;
 
 		try {
 			try (var output = new BufferedOutputStream(processingEnv.get().getFiler().createSourceFile(newClassName, method).openOutputStream())) {
@@ -165,9 +170,13 @@ abstract class SourceBuilder {
 			}
 
 			alreadyCreatedFiles.add(newClassName);
+
+			return true;
 		} catch (IOException ioe) {
 			error(ioe.getMessage(), method);
 		}
+
+		return false;
 	}
 
 	private static String methodSignature(ExecutableElement method) {

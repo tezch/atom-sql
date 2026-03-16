@@ -208,7 +208,9 @@ class SqlProxyProcessor {
 				var dataType = t.getTypeArguments().get(0);
 
 				if (needsDataObjectBuild) {
-					dataObjectBuilder.execute(p);
+					if (dataObjectBuilder.execute(p)) {
+						return ReturnTypeCheckerResult.newInstance(dataType, null);
+					}
 				}
 
 				if (isAnnotated(dataType, DataObject.class)) {
@@ -232,7 +234,9 @@ class SqlProxyProcessor {
 				var dataType = t.getTypeArguments().get(0);
 
 				if (needsDataObjectBuild) {
-					dataObjectBuilder.execute(p);
+					if (dataObjectBuilder.execute(p)) {
+						return ReturnTypeCheckerResult.newInstance(dataType, null);
+					}
 				}
 
 				if (isAnnotated(dataType, DataObject.class)) {
@@ -258,13 +262,14 @@ class SqlProxyProcessor {
 			}
 
 			if (ProcessorUtils.sameClass(type, Protoatom.class)) {
+				var dataObjectCreated = false;
 				if (needsDataObjectBuild) {
-					dataObjectBuilder.execute(p);
+					dataObjectCreated = dataObjectBuilder.execute(p);
 				}
 
 				protoatomImplanterBuilder.execute(p);
 
-				return processProtoatom(t, p);
+				return processProtoatom(t, p, dataObjectCreated);
 			}
 
 			return errorAction(t, p);
@@ -296,13 +301,12 @@ class SqlProxyProcessor {
 			if (ProcessorUtils.sameClass(type, Protoatom.class)) {
 				protoatomImplanterBuilder.execute(p);
 
+				var dataObjectCreated = false;
 				if (needsDataObjectBuild) {
-					dataObjectBuilder.execute(p);
-
-					return processDataObject(t);
+					dataObjectCreated = dataObjectBuilder.execute(p);
 				}
 
-				return processProtoatom(t, p);
+				return processProtoatom(t, p, dataObjectCreated);
 			}
 
 			return errorAction(t, p);
@@ -312,16 +316,18 @@ class SqlProxyProcessor {
 			return ReturnTypeCheckerResult.newInstance(t.getTypeArguments().get(0));
 		}
 
-		private ReturnTypeCheckerResult processProtoatom(DeclaredType t, ExecutableElement p) {
+		private ReturnTypeCheckerResult processProtoatom(DeclaredType t, ExecutableElement p, boolean dataObjectCreated) {
 			var dataType = t.getTypeArguments().get(0);
 
 			if (ProcessorUtils.toElement(dataType) == null) {
 				// <?>
 				// Protoatomの場合は、結果型パラメータを指定しなくてOK
 				dataType = null;
-			} else if (!isAnnotated(dataType, DataObject.class) && !ProcessorUtils.canUse(ProcessorUtils.toTypeElement(dataType))) {
-				return errorDataType(dataType, p);
-			}
+			} else if (!dataObjectCreated //自動生成DataObjectが実際に作成された場合は検査できないのでスキップ
+				&& !isAnnotated(dataType, DataObject.class)
+				&& !ProcessorUtils.canUse(ProcessorUtils.toTypeElement(dataType))) {
+					return errorDataType(dataType, p);
+				}
 
 			var protoatomImplanterType = t.getTypeArguments().get(1);
 			if (ProcessorUtils.toElement(protoatomImplanterType) == null) {
