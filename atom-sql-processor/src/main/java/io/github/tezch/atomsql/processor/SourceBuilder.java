@@ -3,7 +3,6 @@ package io.github.tezch.atomsql.processor;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -63,7 +62,8 @@ abstract class SourceBuilder {
 				if (Files.exists(ProcessorUtils.getClassOutputPath(env).resolve(fileName))) {
 					var listFile = env.getFiler().getResource(StandardLocation.CLASS_OUTPUT, "", fileName);
 					try (var input = listFile.openInputStream()) {
-						Arrays.stream(new String(AtomSqlUtils.readBytes(input), Constants.CHARSET).split("\\s+"))
+						new String(AtomSqlUtils.readBytes(input), Constants.CHARSET)
+							.lines()
 							.filter(l -> l.length() > 0)//空の場合スキップ
 							.map(l -> new MethodInfo(l))
 							.forEach(i -> allHelperNames.put(i.generatedClass, i));

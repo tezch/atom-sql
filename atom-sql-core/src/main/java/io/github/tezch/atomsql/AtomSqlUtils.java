@@ -3,7 +3,6 @@ package io.github.tezch.atomsql;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -76,7 +75,7 @@ public class AtomSqlUtils {
 		try (var proxyList = url.openStream()) {
 			if (proxyList == null) return Collections.emptyList();
 
-			return Arrays.stream(new String(AtomSqlUtils.readBytes(proxyList), Constants.CHARSET).split("\\s+")).map(l -> {
+			return new String(AtomSqlUtils.readBytes(proxyList), Constants.CHARSET).lines().map(l -> {
 				try {
 					return Class.forName(l, false, Thread.currentThread().getContextClassLoader());
 				} catch (ClassNotFoundException e) {

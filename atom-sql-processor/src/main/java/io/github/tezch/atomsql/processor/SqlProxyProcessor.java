@@ -4,7 +4,6 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.nio.file.Files;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -113,9 +112,7 @@ class SqlProxyProcessor {
 			if (Files.exists(ProcessorUtils.getClassOutputPath(env).resolve(Constants.PROXY_LIST))) {
 				var listFile = env.getFiler().getResource(StandardLocation.CLASS_OUTPUT, "", Constants.PROXY_LIST);
 				try (var input = listFile.openInputStream()) {
-					Arrays.stream(
-						new String(AtomSqlUtils.readBytes(input), Constants.CHARSET).split("\\s+"))
-						.forEach(l -> sqlProxyList.add(l));
+					new String(AtomSqlUtils.readBytes(input), Constants.CHARSET).lines().forEach(l -> sqlProxyList.add(l));
 				}
 			}
 
