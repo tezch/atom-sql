@@ -37,6 +37,22 @@ public class AtomSqlAutoConfiguration {
 	AtomSql atomSql(AtomSqlProperties config, GenericApplicationContext context) {
 		AtomSql.initializeIfUninitialized(config);
 
-		return new AtomSql(AtomSqlInitializer.endpoints(context, t -> new JdbcTemplateEndpoint(t)));
+		JdbcTemplateEndpointFactory factory;
+
+		var className = config.jdbcTemplateEndpointFactoryClass();
+		if (className == null || className.isBlank()) {
+			factory = t -> new JdbcTemplateEndpoint(t);
+		} else {
+			try {
+				factory = (JdbcTemplateEndpointFactory) Class.forName(
+					className,
+					true,
+					Thread.currentThread().getContextClassLoader()).getConstructor().newInstance();
+			} catch (Exception e) {
+				throw new IllegalStateException(e);
+			}
+		}
+
+		return new AtomSql(AtomSqlInitializer.endpoints(context, factory));
 	}
 }
