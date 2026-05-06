@@ -361,7 +361,7 @@ public int updateSample(String name, int id);
 
 - Atom SQLで使用可能な型  
 バインド可能な型はあらかじめ定められており、それ以外の型を使用するには`AtomSqlTypeFactory`を新たに拡張する等する必要がある  
-使用可能な型は`io.github.tezch.atomsql.AtomSqlType`というインターフェイスを実装するクラスとして定義されており、`io.github.tezch.atomsql.type`パッケージに属している  
+使用可能な型は`io.github.tezch.atomsql.AtomSqlType`というインターフェイスを実装するクラスとして定義されており、enum`io.github.tezch.atomsql.DefaultAtomSqlType`の各要素または`io.github.tezch.atomsql.type`パッケージに属しているクラスが用意されている  
 
 |型名|Javaクラス|SQLでの型|スレッドセーフか?|
 |:--|:--|:--|:--:|
@@ -714,7 +714,19 @@ public int updateSample1(String secret);
 // secretのみログに<<SENSITIVE>>と出力される
 @Sensitive("secret")
 @Sql("UPDATE sample SET secret = :secret, name = :name WHERE id = 1")
-public int updateSample2(String secret);
+public int updateSample2(String secret, String name);
+
+// secretのみログに<<SENSITIVE>>と出力される
+@Sql("UPDATE sample SET secret = :secret, name = :name WHERE id = 1")
+public int updateSample2(@Sensitive String secret, String name);
+
+// secretとnameともログに<<SENSITIVE>>と出力される
+@Sql("UPDATE sample SET secret = :secret, name = :name WHERE id = 1")
+public int updateSample2(@Sensitive Consumer<SampleParameters> consumer);
+
+// secretのみログに<<SENSITIVE>>と出力される
+@Sql("UPDATE sample SET secret = :secret, name = :name WHERE id = 1")
+public int updateSample2(@Sensitive("secret") Consumer<SampleParameters> consumer);
 ```
 
 ## Spring Framework  
