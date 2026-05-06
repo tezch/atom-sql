@@ -24,7 +24,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import io.github.tezch.atomsql.AtomSql.SqlProxyHelper;
-import io.github.tezch.atomsql.Endpoint.BindingValue;
+import io.github.tezch.atomsql.SqlService.BindingValue;
 import io.github.tezch.atomsql.annotation.DataObject;
 import io.github.tezch.atomsql.annotation.OptionalColumn;
 import io.github.tezch.atomsql.annotation.Sql;
@@ -295,7 +295,7 @@ public class Atom<T> {
 		Methods methods;
 		try {
 			methods = Class.forName(
-				resultClass.getName() + Constants.METADATA_CLASS_SUFFIX,
+				resultClass.getName() + AtomSql.METADATA_CLASS_SUFFIX,
 				true,
 				Thread.currentThread().getContextClassLoader()).getAnnotation(Methods.class);
 		} catch (ClassNotFoundException e) {
@@ -425,7 +425,7 @@ public class Atom<T> {
 	private OptionalDatas loadOptionalDatas() {
 		try {
 			return Class.forName(
-				helper.resultClass().getName() + Constants.DATA_OBJECT_METADATA_CLASS_SUFFIX,
+				helper.resultClass().getName() + AtomSql.DATA_OBJECT_METADATA_CLASS_SUFFIX,
 				true,
 				Thread.currentThread().getContextClassLoader()).getAnnotation(OptionalDatas.class);
 		} catch (ClassNotFoundException e) {
@@ -540,7 +540,7 @@ public class Atom<T> {
 	 * このメソッドで生成されたインスタンスでは、検索等のデータベース操作を行うことはできません。<br>
 	 * 通常生成されたAtomインスタンスに結合するためだけに使用してください。<br>
 	 * また、このメソッドを呼ぶ前に初期化が完了している必要があります。
-	 * @see AtomSql#initialize(Configure)
+	 * @see AtomSql#initialize(Configuration)
 	 * @param creator {@link Function}
 	 * @return creator内で生成されたインスタンス
 	 */
@@ -620,7 +620,7 @@ public class Atom<T> {
 	 * @return データオブジェクトの型が与えられた新インスタンス
 	 */
 	public <R> Atom<R> apply(Class<R> dataObjectClass) {
-		if (dataObjectClass.getAnnotation(DataObject.class) == null)
+		if (!dataObjectClass.isAnnotationPresent(DataObject.class))
 			throw new IllegalStateException("dataObjectClass required annotation @" + DataObject.class.getSimpleName());
 
 		return new Atom<R>(
@@ -663,7 +663,7 @@ public class Atom<T> {
 		var startNanos = System.nanoTime();
 		try {
 			return helper.entry()
-				.endpoint()
+				.sqlService()
 				.queryForStream(
 					sqlComposite().compiled().sqlString(),
 					preparedStatementSetter,
@@ -753,7 +753,7 @@ public class Atom<T> {
 		if (resources == null) {//バッチ実行中ではない
 			var startNanos = System.nanoTime();
 			try {
-				return entry.endpoint()
+				return entry.sqlService()
 					.update(
 						sqlComposite().compiled().sqlString(),
 						preparedStatementSetter,
@@ -784,7 +784,7 @@ public class Atom<T> {
 			var startNanos = System.nanoTime();
 			try {
 				resultConsumer.accept(
-					entry.endpoint()
+					entry.sqlService()
 						.update(
 							sqlComposite().compiled().sql().toString(),
 							preparedStatementSetter,
@@ -1054,7 +1054,13 @@ public class Atom<T> {
 
 				var sql = sqlComposite.compiled();
 
-				sql.placeholders().forEach(p -> i[0] = p.type().bind(i[0], ps, p.value()));
+				sql.placeholders().forEach(p -> {
+					try {
+						i[0] = p.type().bind(i[0], ps, p.value());
+					} catch (SQLException e) {
+						throw new AtomSqlException(e);
+					}
+				});
 
 				helper.sqlLogger().perform(logger -> {
 					var entry = helper.entry();
@@ -1089,11 +1095,11 @@ public class Atom<T> {
 
 					var placeholders = sql.placeholders();
 
-					if (placeholders.stream().filter(p -> p.confidential()).findFirst().isPresent()) {
+					if (placeholders.stream().filter(p -> p.sensitive()).findFirst().isPresent()) {
 						var bindingValues = placeholders.stream().map(p -> {
 							String value;
-							if (p.confidential()) {
-								value = Constants.CONFIDENTIAL;
+							if (p.sensitive()) {
+								value = "<<SENSITIVE>>";
 							} else {
 								value = AtomSqlUtils.toStringForBindingValue(p.value());
 							}
@@ -1101,15 +1107,15 @@ public class Atom<T> {
 							return new BindingValue(p.name().toString(), value);
 						}).toList();
 
-						entry.endpoint()
-							.logConfidentialSql(
+						entry.sqlService()
+							.logSensitiveSql(
 								logger,
 								sqlComposite.originalString(),
 								sql.sqlString(),
 								bindingValues,
 								snapshot);
 					} else {
-						entry.endpoint()
+						entry.sqlService()
 							.logSql(
 								logger,
 								sqlComposite.originalString(),

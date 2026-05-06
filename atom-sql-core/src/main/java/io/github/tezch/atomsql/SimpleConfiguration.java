@@ -14,20 +14,20 @@ import io.github.tezch.atomsql.annotation.Qualifier;
  * @param batchThreshold バッチ更新時の閾値
  * @param cacheCapacity キャッシュの最大値
  */
-public record SimpleConfigure(
+public record SimpleConfiguration(
 	boolean enableLog,
 	String logStacktracePattern,
 	boolean shouldIgnoreNoSqlLog,
 	boolean usesQualifier,
 	String typeFactoryClass,
 	int batchThreshold,
-	int cacheCapacity) implements Configure {
+	int cacheCapacity) implements Configuration {
 
 	/**
 	 * スタブ設定
 	 * @return スタブ設定
 	 */
-	public static Configure stub() {
-		return new SimpleConfigure(false, null, false, false, null, 0, 0);
+	public static Configuration stub() {
+		return new SimpleConfiguration(false, null, false, false, null, 0, 0);
 	}
 }

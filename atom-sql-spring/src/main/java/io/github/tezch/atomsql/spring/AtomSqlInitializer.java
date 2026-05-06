@@ -11,8 +11,8 @@ import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import io.github.tezch.atomsql.AtomSqlUtils;
-import io.github.tezch.atomsql.Endpoint;
-import io.github.tezch.atomsql.Endpoints;
+import io.github.tezch.atomsql.SqlService;
+import io.github.tezch.atomsql.SqlServices;
 import io.github.tezch.atomsql.annotation.SqlProxy;
 
 /**
@@ -54,24 +54,24 @@ public class AtomSqlInitializer {
 	/**
 	 * 
 	 * @param context {@link GenericApplicationContext}
-	 * @param endpointBuilder {@link JdbcTemplate}から{@link Endpoint}を生成
-	 * @return {@link Endpoints}
+	 * @param sqlServiceBuilder {@link JdbcTemplate}から{@link SqlService}を生成
+	 * @return {@link SqlServices}
 	 */
-	public static Endpoints endpoints(
+	public static SqlServices sqlServices(
 		@SuppressWarnings("exports") GenericApplicationContext context,
-		@SuppressWarnings("exports") Function<JdbcTemplate, Endpoint> endpointBuilder) {
+		@SuppressWarnings("exports") Function<JdbcTemplate, SqlService> sqlServiceBuilder) {
 		var map = context.getBeansOfType(JdbcTemplate.class);
 		var primary = context.getBean(JdbcTemplate.class);
 
 		if (map.size() == 1) {
-			return new Endpoints(endpointBuilder.apply(primary));
+			return new SqlServices(sqlServiceBuilder.apply(primary));
 		}
 
 		var entries = map.entrySet().stream().map(e -> {
 			var jdbcTemplate = e.getValue();
-			return new Endpoints.Entry(e.getKey(), endpointBuilder.apply(jdbcTemplate), jdbcTemplate == primary);
-		}).toArray(Endpoints.Entry[]::new);
+			return new SqlServices.Entry(e.getKey(), sqlServiceBuilder.apply(jdbcTemplate), jdbcTemplate == primary);
+		}).toArray(SqlServices.Entry[]::new);
 
-		return new Endpoints(entries);
+		return new SqlServices(entries);
 	}
 }

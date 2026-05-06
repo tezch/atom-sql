@@ -8,9 +8,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
-import io.github.tezch.atomsql.type.CSV;
-import io.github.tezch.atomsql.type.NULL;
-import io.github.tezch.atomsql.type.OBJECT;
+import io.github.tezch.atomsql.type.CsvType;
 
 class SqlComposite {
 
@@ -147,7 +145,7 @@ class SqlComposite {
 
 	static record Placeholder(
 		String name, //プレースホルダ名
-		boolean confidential,
+		boolean sensitive,
 		SecureString expression, //置換後のプレースホルダ
 		String original, //元のプレースホルダ文字列全体（型ヒントを含む）
 		AtomSqlType type, //Object型の場合、実際の値から判定した型
@@ -178,7 +176,7 @@ class SqlComposite {
 
 			return new Placeholder(
 				name,
-				confidential,
+				sensitive,
 				new SecureString(computedType.placeholderExpression(value)),
 				original,
 				computedType,
@@ -198,7 +196,7 @@ class SqlComposite {
 
 		@Override
 		public boolean nonThreadSafeValue(AtomSqlTypeFactory typeFactory) {
-			return CSV.tryNonThreadSafe(value, typeFactory, () -> type.nonThreadSafe());
+			return CsvType.tryNonThreadSafe(value, typeFactory, () -> type.nonThreadSafe());
 		}
 
 		@Override
@@ -214,7 +212,7 @@ class SqlComposite {
 
 	static record Prototype(
 		String name, //プレースホルダ名
-		boolean confidential,
+		boolean sensitive,
 		String original, //元のプレースホルダ文字列全体（型ヒントを含む）
 		AtomSqlType type //型
 	) implements Component {
@@ -237,7 +235,7 @@ class SqlComposite {
 
 			return new Placeholder(
 				name,
-				confidential,
+				sensitive,
 				new SecureString(computedType.placeholderExpression(value)),
 				original,
 				computedType,
@@ -272,12 +270,12 @@ class SqlComposite {
 	}
 
 	private static AtomSqlType computeType(AtomSqlType type, Object value, AtomSqlTypeFactory typeFactory) {
-		if (type != OBJECT.instance) return type;
+		if (type != DefaultAtomSqlType.OBJECT) return type;
 
 		//型がOBJECTの場合
 		//値がnullの場合、仕方がないのでPreparedStatementにnullを設定できるようにNULLをセットする
 		//nullでなければ値から型を判定
-		return value == null ? NULL.instance : typeFactory.select(value.getClass());
+		return value == null ? DefaultAtomSqlType.NULL : typeFactory.select(value.getClass());
 	}
 
 	final boolean containsNonThreadSafeValue;

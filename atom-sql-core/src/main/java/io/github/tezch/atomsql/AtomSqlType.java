@@ -5,188 +5,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import io.github.tezch.atomsql.annotation.NonThreadSafe;
-import io.github.tezch.atomsql.type.BIG_DECIMAL;
-import io.github.tezch.atomsql.type.BINARY_STREAM;
-import io.github.tezch.atomsql.type.BLOB;
-import io.github.tezch.atomsql.type.BOOLEAN;
-import io.github.tezch.atomsql.type.BYTE_ARRAY;
-import io.github.tezch.atomsql.type.CHARACTER_STREAM;
-import io.github.tezch.atomsql.type.CLOB;
-import io.github.tezch.atomsql.type.CSV;
-import io.github.tezch.atomsql.type.DATE;
-import io.github.tezch.atomsql.type.DATETIME;
-import io.github.tezch.atomsql.type.DOUBLE;
-import io.github.tezch.atomsql.type.FLOAT;
-import io.github.tezch.atomsql.type.INTEGER;
-import io.github.tezch.atomsql.type.LONG;
-import io.github.tezch.atomsql.type.OBJECT;
-import io.github.tezch.atomsql.type.P_BOOLEAN;
-import io.github.tezch.atomsql.type.P_DOUBLE;
-import io.github.tezch.atomsql.type.P_FLOAT;
-import io.github.tezch.atomsql.type.P_INT;
-import io.github.tezch.atomsql.type.P_LONG;
-import io.github.tezch.atomsql.type.STRING;
-import io.github.tezch.atomsql.type.TIME;
 
 /**
  * Atom SQLで使用可能な型を表すインターフェイスです。
  * @author tezch
  */
 public interface AtomSqlType {
-
-	/**
-	 * BIG_DECIMAL<br>
-	 * 型ヒント用型名文字列
-	 * @see BIG_DECIMAL
-	 */
-	public static final String BIG_DECIMAL = "BIG_DECIMAL";
-
-	/**
-	 * BINARY_STREAM<br>
-	 * 型ヒント用型名文字列
-	 * @see BINARY_STREAM
-	 */
-	public static final String BINARY_STREAM = "BINARY_STREAM";
-
-	/**
-	 * BLOB<br>
-	 * 型ヒント用型名文字列
-	 * @see BLOB
-	 */
-	public static final String BLOB = "BLOB";
-
-	/**
-	 * BOOLEAN<br>
-	 * 型ヒント用型名文字列
-	 * @see BOOLEAN
-	 */
-	public static final String BOOLEAN = "BOOLEAN";
-
-	/**
-	 * BYTE_ARRAY<br>
-	 * 型ヒント用型名文字列
-	 * @see BYTE_ARRAY
-	 */
-	public static final String BYTE_ARRAY = "BYTE_ARRAY";
-
-	/**
-	 * CHARACTER_STREAM<br>
-	 * 型ヒント用型名文字列
-	 * @see CHARACTER_STREAM
-	 */
-	public static final String CHARACTER_STREAM = "CHARACTER_STREAM";
-
-	/**
-	 * CLOB<br>
-	 * 型ヒント用型名文字列
-	 * @see CLOB
-	 */
-	public static final String CLOB = "CLOB";
-
-	/**
-	 * CSV<br>
-	 * 型ヒント用型名文字列
-	 * @see CSV
-	 */
-	public static final String CSV = "CSV";
-
-	/**
-	 * DATE<br>
-	 * 型ヒント用型名文字列
-	 * @see DATE
-	 */
-	public static final String DATE = "DATE";
-
-	/**
-	 * DATETIME<br>
-	 * 型ヒント用型名文字列
-	 * @see DATETIME
-	 */
-	public static final String DATETIME = "DATETIME";
-
-	/**
-	 * DOUBLE<br>
-	 * 型ヒント用型名文字列
-	 * @see DOUBLE
-	 */
-	public static final String DOUBLE = "DOUBLE";
-
-	/**
-	 * FLOAT<br>
-	 * 型ヒント用型名文字列
-	 * @see FLOAT
-	 */
-	public static final String FLOAT = "FLOAT";
-
-	/**
-	 * INTEGER<br>
-	 * 型ヒント用型名文字列
-	 * @see INTEGER
-	 */
-	public static final String INTEGER = "INTEGER";
-
-	/**
-	 * LONG<br>
-	 * 型ヒント用型名文字列
-	 * @see LONG
-	 */
-	public static final String LONG = "LONG";
-
-	/**
-	 * OBJECT<br>
-	 * 型ヒント用型名文字列
-	 * @see OBJECT
-	 */
-	public static final String OBJECT = "OBJECT";
-
-	/**
-	 * P_BOOLEAN<br>
-	 * 型ヒント用型名文字列
-	 * @see P_BOOLEAN
-	 */
-	public static final String P_BOOLEAN = "P_BOOLEAN";
-
-	/**
-	 * P_DOUBLE<br>
-	 * 型ヒント用型名文字列
-	 * @see P_DOUBLE
-	 */
-	public static final String P_DOUBLE = "P_DOUBLE";
-
-	/**
-	 * P_FLOAT<br>
-	 * 型ヒント用型名文字列
-	 * @see P_FLOAT
-	 */
-	public static final String P_FLOAT = "P_FLOAT";
-
-	/**
-	 * P_INT<br>
-	 * 型ヒント用型名文字列
-	 * @see P_INT
-	 */
-	public static final String P_INT = "P_INT";
-
-	/**
-	 * P_LONG<br>
-	 * 型ヒント用型名文字列
-	 * @see P_LONG
-	 */
-	public static final String P_LONG = "P_LONG";
-
-	/**
-	 * STRING<br>
-	 * 型ヒント用型名文字列
-	 * @see STRING
-	 */
-	public static final String STRING = "STRING";
-
-	/**
-	 * TIME<br>
-	 * 型ヒント用型名文字列
-	 * @see TIME
-	 */
-	public static final String TIME = "TIME";
 
 	/**
 	 * この型に対応するJavaでの型を返します。
@@ -200,8 +24,9 @@ public interface AtomSqlType {
 	 * @param statement
 	 * @param value
 	 * @return 次index
+	 * @throws SQLException
 	 */
-	int bind(int index, PreparedStatement statement, Object value);
+	int bind(int index, PreparedStatement statement, Object value) throws SQLException;
 
 	/**
 	 * この型に合ったメソッドで{@link ResultSet}から値を取得します。
@@ -229,11 +54,17 @@ public interface AtomSqlType {
 	AtomSqlType toTypeArgument();
 
 	/**
+	 * この型の型ヒント(SQL内での表現)を返します。
+	 * @return 型ヒント文字列
+	 */
+	String typeHint();
+
+	/**
 	 * この型がスレッドセーフではないかを返します。
 	 * @return nonThreadSafeの場合、true
 	 */
 	default boolean nonThreadSafe() {
-		return getClass().getAnnotation(NonThreadSafe.class) != null;
+		return getClass().isAnnotationPresent(NonThreadSafe.class);
 	}
 
 	/**

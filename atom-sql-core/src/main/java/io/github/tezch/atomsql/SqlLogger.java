@@ -60,6 +60,6 @@ abstract class SqlLogger {
 	}
 
 	private static void log(Consumer<Logger> consumer) {
-		if (AtomSql.configure().enableLog()) consumer.accept(AtomSql.logger);
+		if (AtomSql.configuration().enableLog()) consumer.accept(AtomSql.logger);
 	}
 }

@@ -15,4 +15,6 @@ module io.github.tezch.atomsql.core {
 	exports io.github.tezch.atomsql.annotation.processor;
 
 	exports io.github.tezch.atomsql.type;
+
+	exports io.github.tezch.atomsql.test;
 }

@@ -10,8 +10,8 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
 import javax.tools.Diagnostic.Kind;
 
+import io.github.tezch.atomsql.AtomSql;
 import io.github.tezch.atomsql.AtomSqlUtils;
-import io.github.tezch.atomsql.Constants;
 import io.github.tezch.atomsql.annotation.Sql;
 import io.github.tezch.atomsql.annotation.SqlFile;
 import io.github.tezch.atomsql.processor.SqlFileResolver.SqlFileNotFoundException;
@@ -87,7 +87,7 @@ class MethodExtractor {
 						packageName.toString(),
 						sqlFileName,
 						env.getOptions()),
-					Constants.CHARSET);
+					AtomSql.CHARSET);
 			} catch (IOException ioe) {
 				throw new UncheckedIOException(ioe);
 			}

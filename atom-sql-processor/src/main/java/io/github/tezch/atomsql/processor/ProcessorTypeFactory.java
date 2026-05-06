@@ -19,7 +19,7 @@ class ProcessorTypeFactory {
 	static final ProcessorTypeFactory instance = new ProcessorTypeFactory();
 
 	final AtomSqlTypeFactory atomSqlTypeFactory = AtomSqlTypeFactory.newInstance(
-		AtomSql.configure().typeFactoryClass(),
+		AtomSql.configuration().typeFactoryClass(),
 		AtomSqlTypeFactory.class.getClassLoader());
 
 	AtomSqlType typeOf(String name) {
@@ -79,6 +79,11 @@ class ProcessorTypeFactory {
 		@Override
 		public String typeArgumentExpression() {
 			return typeExpression();
+		}
+
+		@Override
+		public String typeHint() {
+			throw new UnsupportedOperationException();
 		}
 	}
 }

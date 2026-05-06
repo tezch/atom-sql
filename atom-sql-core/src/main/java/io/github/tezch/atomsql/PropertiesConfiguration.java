@@ -12,7 +12,7 @@ import io.github.tezch.atomsql.annotation.Qualifier;
  * Atom SQL用の設定をロードし、保持するクラスです。
  * @author tezch
  */
-public class PropertiesConfigure implements Configure {
+public class PropertiesConfiguration implements Configuration {
 
 	private final String configFileName = "atom-sql.properties";
 
@@ -68,10 +68,10 @@ public class PropertiesConfigure implements Configure {
 	/**
 	 * クラスパスのルートにあるatom-sql.propertiesから設定を読み込みインスタンスを作成します。
 	 */
-	public PropertiesConfigure() {
+	public PropertiesConfiguration() {
 		var config = new Properties();
 
-		try (var input = PropertiesConfigure.class.getClassLoader().getResourceAsStream(configFileName)) {
+		try (var input = PropertiesConfiguration.class.getClassLoader().getResourceAsStream(configFileName)) {
 			if (input != null)
 				config.load(input);
 		} catch (IOException e) {
@@ -91,7 +91,7 @@ public class PropertiesConfigure implements Configure {
 		batchThreshold = Integer.parseInt(config.getProperty("batch-threshold", "0"));
 
 		cacheCapacity = Integer.parseInt(
-			Optional.ofNullable(config.getProperty("cache-capacity")).orElse(Constants.DEFAULT_CACHE_SIZE));
+			Optional.ofNullable(config.getProperty("cache-capacity")).orElse(AtomSql.DEFAULT_CACHE_SIZE));
 	}
 
 	@Override

@@ -9,7 +9,7 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ExecutableElement;
 
 import io.github.tezch.atomsql.Atom;
-import io.github.tezch.atomsql.Constants;
+import io.github.tezch.atomsql.AtomSql;
 import io.github.tezch.atomsql.Protoatom;
 
 class ProtoatomImplanterBuilder extends HelperBuilder {
@@ -80,6 +80,6 @@ class ProtoatomImplanterBuilder extends HelperBuilder {
 			fields.add(field);
 		});
 
-		param.put("FIELDS", String.join(Constants.NEW_LINE, fields));
+		param.put("FIELDS", String.join(AtomSql.NEW_LINE, fields));
 	}
 }

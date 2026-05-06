@@ -1,4 +1,4 @@
-package io.github.tezch.atomsql;
+package io.github.tezch.atomsql.test;
 
 import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
@@ -17,6 +17,17 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
+import io.github.tezch.atomsql.AtomSql;
+import io.github.tezch.atomsql.AtomSqlInitializer;
+import io.github.tezch.atomsql.AtomSqlUtils;
+import io.github.tezch.atomsql.BatchPreparedStatementSetter;
+import io.github.tezch.atomsql.Configuration;
+import io.github.tezch.atomsql.ConnectionProxy;
+import io.github.tezch.atomsql.SqlService;
+import io.github.tezch.atomsql.SqlServices;
+import io.github.tezch.atomsql.PreparedStatementSetter;
+import io.github.tezch.atomsql.RowMapper;
+import io.github.tezch.atomsql.SqlProxySnapshot;
 import io.github.tezch.atomsql.annotation.SqlProxy;
 
 /**
@@ -38,7 +49,7 @@ public class Sandbox {
 		AtomSqlInitializer.initializeIfUninitialized();
 		pairs.set(new LinkedList<Pair>());
 		try {
-			process.accept(new AtomSql(new Endpoints(new SandboxEndpoint())));
+			process.accept(new AtomSql(new SqlServices(new SandboxSqlService())));
 		} finally {
 			pairs.remove();
 			resultHolder.remove();
@@ -48,14 +59,14 @@ public class Sandbox {
 	/**
 	 * このサンドボックス環境用の{@link AtomSql}が提供されるので、使用者はそれにより{@link SqlProxy}を生成、検査を行います。<br>
 	 * デフォルトではない設定を使用できます。
-	 * @param config {@link Configure}
+	 * @param config {@link Configuration}
 	 * @param process 検査したい処理
 	 */
-	public static void execute(Configure config, Consumer<AtomSql> process) {
+	public static void execute(Configuration config, Consumer<AtomSql> process) {
 		AtomSql.initialize(config);
 		pairs.set(new LinkedList<Pair>());
 		try {
-			process.accept(new AtomSql(new Endpoints(new SandboxEndpoint())));
+			process.accept(new AtomSql(new SqlServices(new SandboxSqlService())));
 		} finally {
 			pairs.remove();
 			resultHolder.remove();
@@ -73,7 +84,7 @@ public class Sandbox {
 		resultHolder.set(result);
 	}
 
-	private static class SandboxEndpoint implements Endpoint {
+	private static class SandboxSqlService implements SqlService {
 
 		@Override
 		public int[] batchUpdate(String sql, BatchPreparedStatementSetter bpss) {
@@ -146,9 +157,9 @@ public class Sandbox {
 
 			logger.log(Level.INFO, "method: " + snapshot.getClassName() + "#" + snapshot.getMethodSignature());
 
-			logger.log(Level.INFO, "sql:" + Constants.NEW_LINE + originalSql);
+			logger.log(Level.INFO, "sql:" + AtomSql.NEW_LINE + originalSql);
 
-			logger.log(Level.INFO, "processed sql:" + Constants.NEW_LINE + sql);
+			logger.log(Level.INFO, "processed sql:" + AtomSql.NEW_LINE + sql);
 
 			logger.log(Level.INFO, "binding values:");
 
@@ -161,7 +172,7 @@ public class Sandbox {
 		}
 
 		@Override
-		public void logConfidentialSql(
+		public void logSensitiveSql(
 			Logger logger,
 			String originalSql,
 			String sql,
@@ -169,9 +180,9 @@ public class Sandbox {
 			SqlProxySnapshot snapshot) {
 			logger.log(Level.INFO, "method: " + snapshot.getClassName() + "#" + snapshot.getMethodSignature());
 
-			logger.log(Level.INFO, "sql:" + Constants.NEW_LINE + originalSql);
+			logger.log(Level.INFO, "sql:" + AtomSql.NEW_LINE + originalSql);
 
-			logger.log(Level.INFO, "processed sql:" + Constants.NEW_LINE + sql);
+			logger.log(Level.INFO, "processed sql:" + AtomSql.NEW_LINE + sql);
 
 			logger.log(Level.INFO, "binding values:");
 
@@ -179,7 +190,7 @@ public class Sandbox {
 		}
 
 		@Override
-		public void bollowConnection(Consumer<ConnectionProxy> consumer) {
+		public void borrowConnection(Consumer<ConnectionProxy> consumer) {
 			throw new UnsupportedOperationException();
 		}
 	}

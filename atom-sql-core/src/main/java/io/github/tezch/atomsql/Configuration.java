@@ -7,7 +7,7 @@ import io.github.tezch.atomsql.annotation.Qualifier;
  * Atom SQL用の設定をロードし、保持するクラスです。
  * @author tezch
  */
-public interface Configure {
+public interface Configuration {
 
 	/**
 	 * enable-log<br>

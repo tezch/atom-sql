@@ -10,40 +10,36 @@ import java.util.Objects;
 
 import io.github.tezch.atomsql.AtomSqlException;
 import io.github.tezch.atomsql.AtomSqlType;
+import io.github.tezch.atomsql.AtomSqlUtils;
 import io.github.tezch.atomsql.EnumNotFoundException;
-import io.github.tezch.atomsql.annotation.StringEnumValue;
+import io.github.tezch.atomsql.annotation.EnumValue;
 
 /**
  * {@link Enum}
  */
-public class STRING_ENUM implements AtomSqlType {
+public class EnumType implements AtomSqlType {
 
 	private final Class<? extends Enum<?>> enumClass;
 
-	private final Map<String, Enum<?>> enumMap = new HashMap<>();
+	private final Map<Integer, Enum<?>> enumMap = new HashMap<>();
 
-	private final Map<Enum<?>, String> valueMap = new HashMap<>();
+	private final Map<Enum<?>, Integer> valueMap = new HashMap<>();
 
 	/**
 	 * コンストラクタ
 	 * @param enumClass
 	 */
-	public STRING_ENUM(Class<? extends Enum<?>> enumClass) {
+	public EnumType(Class<? extends Enum<?>> enumClass) {
 		this.enumClass = Objects.requireNonNull(enumClass);
 
 		var enums = enumClass.getEnumConstants();
 
+		var fields = enumClass.getFields();
+
 		for (var e : enums) {
-			var name = e.name();
-
-			StringEnumValue enumValue;
-			try {
-				enumValue = enumClass.getField(name).getAnnotation(StringEnumValue.class);
-			} catch (NoSuchFieldException ex) {
-				throw new IllegalStateException(ex);
-			}
-
-			var value = enumValue == null ? name : enumValue.value();
+			var ordinal = e.ordinal();
+			var enumValue = fields[ordinal].getAnnotation(EnumValue.class);
+			var value = enumValue == null ? ordinal : enumValue.value();
 
 			enumMap.put(value, e);
 			valueMap.put(e, value);
@@ -57,11 +53,11 @@ public class STRING_ENUM implements AtomSqlType {
 
 	@Override
 	public int bind(int index, PreparedStatement statement, Object value) {
-		if (value == null) return NullBinder.bind(index, statement, Types.INTEGER);
+		if (value == null) return AtomSqlUtils.bindAsNull(index, statement, Types.INTEGER);
 
 		var val = Objects.requireNonNull(valueMap.get(value));
 		try {
-			statement.setString(index, val);
+			statement.setInt(index, val);
 			return index + 1;
 		} catch (SQLException e) {
 			throw new AtomSqlException(e);
@@ -70,15 +66,15 @@ public class STRING_ENUM implements AtomSqlType {
 
 	@Override
 	public Object get(ResultSet rs, String columnLabel) throws SQLException {
-		return getInternal(rs, rs.getString(columnLabel));
+		return getInternal(rs, rs.getInt(columnLabel));
 	}
 
 	@Override
 	public Object get(ResultSet rs, int columnIndex) throws SQLException {
-		return getInternal(rs, rs.getString(columnIndex));
+		return getInternal(rs, rs.getInt(columnIndex));
 	}
 
-	private Object getInternal(ResultSet rs, String value) throws SQLException {
+	private Object getInternal(ResultSet rs, int value) throws SQLException {
 		if (rs.wasNull()) return null;
 
 		var e = enumMap.get(value);
@@ -91,5 +87,10 @@ public class STRING_ENUM implements AtomSqlType {
 	@Override
 	public AtomSqlType toTypeArgument() {
 		return this;
+	}
+
+	@Override
+	public String typeHint() {
+		throw new UnsupportedOperationException();
 	}
 }

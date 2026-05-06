@@ -15,7 +15,7 @@ import javax.lang.model.element.Element;
 import javax.lang.model.util.SimpleElementVisitor14;
 import javax.tools.Diagnostic.Kind;
 
-import io.github.tezch.atomsql.Constants;
+import io.github.tezch.atomsql.AtomSql;
 import io.github.tezch.atomsql.annotation.processor.Method;
 
 class MetadataBuilder {
@@ -76,7 +76,7 @@ class MetadataBuilder {
 
 		var packageNameLength = packageName.length();
 		var isPackageNameLengthZero = packageNameLength == 0;
-		var className = binaryName.substring(isPackageNameLengthZero ? 0 : packageNameLength + 1) + Constants.METADATA_CLASS_SUFFIX;
+		var className = binaryName.substring(isPackageNameLengthZero ? 0 : packageNameLength + 1) + AtomSql.METADATA_CLASS_SUFFIX;
 
 		var fileName = isPackageNameLengthZero ? className : packageName + "." + className;
 
@@ -102,7 +102,7 @@ class MetadataBuilder {
 
 		try {
 			try (var output = new BufferedOutputStream(envSupplier.get().getFiler().createSourceFile(fileName, e).openOutputStream())) {
-				output.write(template.getBytes(Constants.CHARSET));
+				output.write(template.getBytes(AtomSql.CHARSET));
 			}
 
 			alreadyCreatedFiles.add(fileName);

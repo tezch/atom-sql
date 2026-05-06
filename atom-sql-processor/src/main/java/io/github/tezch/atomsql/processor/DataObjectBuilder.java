@@ -13,13 +13,13 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ExecutableElement;
 
 import io.github.tezch.atomsql.Atom;
+import io.github.tezch.atomsql.AtomSql;
 import io.github.tezch.atomsql.ColumnFinder;
-import io.github.tezch.atomsql.Constants;
+import io.github.tezch.atomsql.DefaultAtomSqlType;
 import io.github.tezch.atomsql.Protoatom;
 import io.github.tezch.atomsql.SqlMasker;
 import io.github.tezch.atomsql.annotation.DataObject;
 import io.github.tezch.atomsql.processor.MethodExtractor.Result;
-import io.github.tezch.atomsql.type.OBJECT;
 
 /**
  * @author tezch
@@ -110,7 +110,7 @@ class DataObjectBuilder extends SourceBuilder {
 				ProcessorUtils.enumValidator(
 					f.typeArgumentHint
 						.map(typeFactory::typeOf)
-						.orElse(OBJECT.instance),
+						.orElse(DefaultAtomSqlType.OBJECT),
 					column).ifPresent(enumValidators::add);
 			}
 
@@ -152,10 +152,10 @@ class DataObjectBuilder extends SourceBuilder {
 		param.put(
 			"COLUMNS",
 			String.join(
-				"," + Constants.NEW_LINE,
+				"," + AtomSql.NEW_LINE,
 				columns.stream().map(c -> c.typeExpression + " " + c.column).toList()));
 
-		param.put("ENUM_VALIDATORS", String.join(Constants.NEW_LINE, enumValidators));
+		param.put("ENUM_VALIDATORS", String.join(AtomSql.NEW_LINE, enumValidators));
 
 		return Formatter.format(template, param);
 	}
@@ -178,28 +178,28 @@ class DataObjectBuilder extends SourceBuilder {
 		param.put(
 			"COLUMNS",
 			String.join(
-				Constants.NEW_LINE,
+				AtomSql.NEW_LINE,
 				columns.stream().map(c -> String.format("public %s %s;", c.typeExpression, c.column)).toList()));
 
 		param.put(
 			"FIELDS",
 			String.join(
-				Constants.NEW_LINE,
+				AtomSql.NEW_LINE,
 				columns.stream().map(c -> String.format("private final %s %s;", c.typeExpression, c.column)).toList()));
 
 		param.put(
 			"METHODS",
 			String.join(
-				Constants.NEW_LINE,
+				AtomSql.NEW_LINE,
 				columns.stream().map(c -> String.format("public %s %s() {return %s;}", c.typeExpression, c.column, c.column)).toList()));
 
 		param.put(
 			"BEAN_TO_COLUMNS",
 			String.join(
-				Constants.NEW_LINE,
+				AtomSql.NEW_LINE,
 				columns.stream().map(c -> String.format("%s = bean.%s;", c.column, c.column)).toList()));
 
-		param.put("ENUM_VALIDATORS", String.join(Constants.NEW_LINE, enumValidators));
+		param.put("ENUM_VALIDATORS", String.join(AtomSql.NEW_LINE, enumValidators));
 
 		return Formatter.format(template, param);
 	}

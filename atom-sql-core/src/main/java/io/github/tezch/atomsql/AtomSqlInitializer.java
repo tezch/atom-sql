@@ -3,17 +3,17 @@ package io.github.tezch.atomsql;
 /**
  * 内部使用クラス
  */
-class AtomSqlInitializer {
+public class AtomSqlInitializer {
 
-	private static final ThreadLocal<Configure> configHolder = ThreadLocal.withInitial(() -> configureInternal());
+	private static final ThreadLocal<Configuration> configHolder = ThreadLocal.withInitial(() -> configurationInternal());
 
-	private static Configure staticConfig;
+	private static Configuration staticConfig;
 
 	/**
 	 * 
 	 * @param config
 	 */
-	synchronized static void initialize(Configure config) {
+	public synchronized static void initialize(Configuration config) {
 		if (staticConfig != null) throw new IllegalStateException("Atom SQL is already initialized");
 		staticConfig = config;
 	}
@@ -21,15 +21,15 @@ class AtomSqlInitializer {
 	/**
 	 * initialize
 	 */
-	static void initialize() {
-		initialize(new PropertiesConfigure());
+	public static void initialize() {
+		initialize(new PropertiesConfiguration());
 	}
 
 	/**
 	 * initializeIfUninitialized
 	 * @param config 
 	 */
-	synchronized static void initializeIfUninitialized(Configure config) {
+	public synchronized static void initializeIfUninitialized(Configuration config) {
 		if (staticConfig != null) return;
 		staticConfig = config;
 	}
@@ -37,21 +37,21 @@ class AtomSqlInitializer {
 	/**
 	 * initializeIfUninitialized
 	 */
-	synchronized static void initializeIfUninitialized() {
+	public synchronized static void initializeIfUninitialized() {
 		if (staticConfig != null) return;
-		initialize(new PropertiesConfigure());
+		initialize(new PropertiesConfiguration());
 	}
 
-	private synchronized static Configure configureInternal() {
+	private synchronized static Configuration configurationInternal() {
 		if (staticConfig == null) throw new IllegalStateException("Atom SQL is not initialized");
 		return staticConfig;
 	}
 
 	/**
 	 * 
-	 * @return {@link Configure}
+	 * @return {@link Configuration}
 	 */
-	static Configure configure() {
+	static Configuration configuration() {
 		return configHolder.get();
 	}
 }

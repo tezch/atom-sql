@@ -12,10 +12,10 @@ import java.util.stream.Stream;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import io.github.tezch.atomsql.AtomSql;
 import io.github.tezch.atomsql.BatchPreparedStatementSetter;
 import io.github.tezch.atomsql.ConnectionProxy;
-import io.github.tezch.atomsql.Constants;
-import io.github.tezch.atomsql.Endpoint;
+import io.github.tezch.atomsql.SqlService;
 import io.github.tezch.atomsql.PreparedStatementSetter;
 import io.github.tezch.atomsql.RowMapper;
 import io.github.tezch.atomsql.SimpleConnectionProxy;
@@ -24,14 +24,14 @@ import io.github.tezch.atomsql.SqlProxySnapshot;
 /**
  * @author tezch
  */
-public class JdbcTemplateEndpoint implements Endpoint {
+public class JdbcTemplateSqlService implements SqlService {
 
 	private final JdbcTemplate jdbcTemplate;
 
 	/**
 	 * @param jdbcTemplate
 	 */
-	public JdbcTemplateEndpoint(@SuppressWarnings("exports") JdbcTemplate jdbcTemplate) {
+	public JdbcTemplateSqlService(@SuppressWarnings("exports") JdbcTemplate jdbcTemplate) {
 		this.jdbcTemplate = Objects.requireNonNull(jdbcTemplate);
 	}
 
@@ -41,7 +41,7 @@ public class JdbcTemplateEndpoint implements Endpoint {
 	@Override
 	public int[] batchUpdate(String sql, BatchPreparedStatementSetter bpss) {
 		// MySQLのPareparedStatement#toString()対策でSQLの先頭に改行を付与
-		return jdbcTemplate.batchUpdate(Constants.NEW_LINE + sql, new org.springframework.jdbc.core.BatchPreparedStatementSetter() {
+		return jdbcTemplate.batchUpdate(AtomSql.NEW_LINE + sql, new org.springframework.jdbc.core.BatchPreparedStatementSetter() {
 
 			@Override
 			public void setValues(PreparedStatement ps, int i) throws SQLException {
@@ -65,7 +65,7 @@ public class JdbcTemplateEndpoint implements Endpoint {
 		RowMapper<T> rowMapper,
 		SqlProxySnapshot snapshot) {
 		// MySQLのPareparedStatement#toString()対策でSQLの先頭に改行を付与
-		return jdbcTemplate.queryForStream(Constants.NEW_LINE + sql, (ps) -> pss.setValues(ps), (rs, rowNum) -> rowMapper.mapRow(rs, rowNum));
+		return jdbcTemplate.queryForStream(AtomSql.NEW_LINE + sql, (ps) -> pss.setValues(ps), (rs, rowNum) -> rowMapper.mapRow(rs, rowNum));
 	}
 
 	/**
@@ -74,7 +74,7 @@ public class JdbcTemplateEndpoint implements Endpoint {
 	@Override
 	public int update(String sql, PreparedStatementSetter pss, SqlProxySnapshot snapshot) {
 		// MySQLのPareparedStatement#toString()対策でSQLの先頭に改行を付与
-		return jdbcTemplate.update(Constants.NEW_LINE + sql, (ps) -> pss.setValues(ps));
+		return jdbcTemplate.update(AtomSql.NEW_LINE + sql, (ps) -> pss.setValues(ps));
 	}
 
 	@Override
@@ -84,24 +84,24 @@ public class JdbcTemplateEndpoint implements Endpoint {
 		String sql,
 		PreparedStatement ps,
 		SqlProxySnapshot snapshot) {
-		logger.log(Level.INFO, "sql:" + Constants.NEW_LINE + ps.toString());
+		logger.log(Level.INFO, "sql:" + AtomSql.NEW_LINE + ps.toString());
 	}
 
 	@Override
-	public void logConfidentialSql(
+	public void logSensitiveSql(
 		Logger logger,
 		String originalSql,
 		String sql,
 		List<BindingValue> bindingValues,
 		SqlProxySnapshot snapshot) {
-		logger.log(Level.INFO, "confidential sql:" + Constants.NEW_LINE + originalSql);
+		logger.log(Level.INFO, "sensitive sql:" + AtomSql.NEW_LINE + originalSql);
 		logger.log(Level.INFO, "binding values:");
 
 		bindingValues.forEach(p -> logger.log(Level.INFO, p.name() + ": " + p.value()));
 	}
 
 	@Override
-	public void bollowConnection(Consumer<ConnectionProxy> consumer) {
+	public void borrowConnection(Consumer<ConnectionProxy> consumer) {
 		jdbcTemplate.execute((ConnectionCallback<Object>) con -> {
 			consumer.accept(new SimpleConnectionProxy(con));
 

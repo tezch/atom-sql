@@ -37,7 +37,6 @@ import io.github.tezch.atomsql.AtomSql;
 import io.github.tezch.atomsql.AtomSqlUtils;
 import io.github.tezch.atomsql.ColumnFinder;
 import io.github.tezch.atomsql.ColumnFinder.Found;
-import io.github.tezch.atomsql.Constants;
 import io.github.tezch.atomsql.Csv;
 import io.github.tezch.atomsql.PlaceholderFinder;
 import io.github.tezch.atomsql.Protoatom;
@@ -109,17 +108,17 @@ class SqlProxyProcessor {
 
 		try {
 			//他のプロセスで作られた過去分を追加
-			if (Files.exists(ProcessorUtils.getClassOutputPath(env).resolve(Constants.PROXY_LIST))) {
-				var listFile = env.getFiler().getResource(StandardLocation.CLASS_OUTPUT, "", Constants.PROXY_LIST);
+			if (Files.exists(ProcessorUtils.getClassOutputPath(env).resolve(AtomSql.PROXY_LIST))) {
+				var listFile = env.getFiler().getResource(StandardLocation.CLASS_OUTPUT, "", AtomSql.PROXY_LIST);
 				try (var input = listFile.openInputStream()) {
-					new String(AtomSqlUtils.readBytes(input), Constants.CHARSET).lines().forEach(l -> sqlProxyList.add(l));
+					new String(AtomSqlUtils.readBytes(input), AtomSql.CHARSET).lines().forEach(l -> sqlProxyList.add(l));
 				}
 			}
 
-			var data = String.join(Constants.NEW_LINE, sqlProxyList).getBytes(Constants.CHARSET);
+			var data = String.join(AtomSql.NEW_LINE, sqlProxyList).getBytes(AtomSql.CHARSET);
 
 			try (var output = new BufferedOutputStream(
-				env.getFiler().createResource(StandardLocation.CLASS_OUTPUT, "", Constants.PROXY_LIST).openOutputStream())) {
+				env.getFiler().createResource(StandardLocation.CLASS_OUTPUT, "", AtomSql.PROXY_LIST).openOutputStream())) {
 				output.write(data);
 			}
 		} catch (IOException ioe) {

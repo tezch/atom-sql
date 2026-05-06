@@ -18,8 +18,8 @@ import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.StandardLocation;
 
+import io.github.tezch.atomsql.AtomSql;
 import io.github.tezch.atomsql.AtomSqlUtils;
-import io.github.tezch.atomsql.Constants;
 import io.github.tezch.atomsql.annotation.SqlProxy;
 import io.github.tezch.atomsql.processor.MethodExtractor.Result;
 import io.github.tezch.atomsql.processor.MethodExtractor.SqlNotFoundException;
@@ -62,7 +62,7 @@ abstract class SourceBuilder {
 				if (Files.exists(ProcessorUtils.getClassOutputPath(env).resolve(fileName))) {
 					var listFile = env.getFiler().getResource(StandardLocation.CLASS_OUTPUT, "", fileName);
 					try (var input = listFile.openInputStream()) {
-						new String(AtomSqlUtils.readBytes(input), Constants.CHARSET)
+						new String(AtomSqlUtils.readBytes(input), AtomSql.CHARSET)
 							.lines()
 							.filter(l -> l.length() > 0)//空の場合スキップ
 							.map(l -> new MethodInfo(l))
@@ -76,11 +76,11 @@ abstract class SourceBuilder {
 		}
 
 		void finish(ProcessingEnvironment env) {
-			var data = String.join(Constants.NEW_LINE, (allHelperNames.values().stream().map(i -> i.pack()).toList()));
+			var data = String.join(AtomSql.NEW_LINE, (allHelperNames.values().stream().map(i -> i.pack()).toList()));
 
 			try (var output = new BufferedOutputStream(
 				env.getFiler().createResource(StandardLocation.CLASS_OUTPUT, "", fileName).openOutputStream())) {
-				output.write(data.getBytes(Constants.CHARSET));
+				output.write(data.getBytes(AtomSql.CHARSET));
 			} catch (IOException e) {
 				env.getMessager().printMessage(Kind.ERROR, e.getMessage());
 			}
@@ -166,7 +166,7 @@ abstract class SourceBuilder {
 
 		try {
 			try (var output = new BufferedOutputStream(processingEnv.get().getFiler().createSourceFile(newClassName, method).openOutputStream())) {
-				output.write(source(generateClassName, method, result).getBytes(Constants.CHARSET));
+				output.write(source(generateClassName, method, result).getBytes(AtomSql.CHARSET));
 			}
 
 			alreadyCreatedFiles.add(newClassName);

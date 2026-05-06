@@ -13,7 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import io.github.tezch.atomsql.AtomSql;
 import io.github.tezch.atomsql.spring.AtomSqlInitializer;
-import io.github.tezch.atomsql.spring.JdbcTemplateEndpoint;
+import io.github.tezch.atomsql.spring.JdbcTemplateSqlService;
 
 /**
  * AtomSqlAutoConfiguration
@@ -37,14 +37,14 @@ public class AtomSqlAutoConfiguration {
 	AtomSql atomSql(AtomSqlProperties config, GenericApplicationContext context) {
 		AtomSql.initializeIfUninitialized(config);
 
-		JdbcTemplateEndpointFactory factory;
+		JdbcTemplateSqlServiceFactory factory;
 
-		var className = config.jdbcTemplateEndpointFactoryClass();
+		var className = config.jdbcTemplateSqlServiceFactoryClass();
 		if (className == null || className.isBlank()) {
-			factory = t -> new JdbcTemplateEndpoint(t);
+			factory = t -> new JdbcTemplateSqlService(t);
 		} else {
 			try {
-				factory = (JdbcTemplateEndpointFactory) Class.forName(
+				factory = (JdbcTemplateSqlServiceFactory) Class.forName(
 					className,
 					true,
 					Thread.currentThread().getContextClassLoader()).getConstructor().newInstance();
@@ -53,6 +53,6 @@ public class AtomSqlAutoConfiguration {
 			}
 		}
 
-		return new AtomSql(AtomSqlInitializer.endpoints(context, factory));
+		return new AtomSql(AtomSqlInitializer.sqlServices(context, factory));
 	}
 }

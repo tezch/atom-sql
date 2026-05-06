@@ -30,7 +30,7 @@ import javax.lang.model.util.SimpleElementVisitor14;
 import javax.lang.model.util.SimpleTypeVisitor14;
 import javax.tools.Diagnostic.Kind;
 
-import io.github.tezch.atomsql.Constants;
+import io.github.tezch.atomsql.AtomSql;
 import io.github.tezch.atomsql.annotation.DataObject;
 import io.github.tezch.atomsql.annotation.OptionalColumn;
 import io.github.tezch.atomsql.processor.MetadataBuilder.MethodInfo;
@@ -124,7 +124,7 @@ class DataObjectProcessor {
 
 		var packageNameLength = packageName.length();
 		var isPackageNameLengthZero = packageNameLength == 0;
-		var className = binaryName.substring(isPackageNameLengthZero ? 0 : packageNameLength + 1) + Constants.DATA_OBJECT_METADATA_CLASS_SUFFIX;
+		var className = binaryName.substring(isPackageNameLengthZero ? 0 : packageNameLength + 1) + AtomSql.DATA_OBJECT_METADATA_CLASS_SUFFIX;
 
 		var fileName = isPackageNameLengthZero ? className : packageName + "." + className;
 
@@ -150,7 +150,7 @@ class DataObjectProcessor {
 
 		try {
 			try (var output = new BufferedOutputStream(env.getFiler().createSourceFile(fileName, e).openOutputStream())) {
-				output.write(template.getBytes(Constants.CHARSET));
+				output.write(template.getBytes(AtomSql.CHARSET));
 			}
 		} catch (IOException ioe) {
 			error(ioe.getMessage(), e);

@@ -6,12 +6,12 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import io.github.tezch.atomsql.type.ENUM;
+import io.github.tezch.atomsql.type.EnumType;
 
 /**
  * enumの各要素にデータベースと対応した値を紐づけるためのアノテーションです。<br>
  * このアノテーションを付与しない場合、{@link Enum#ordinal()}が代わりに使用されます。
- * @see ENUM
+ * @see EnumType
  */
 @Retention(RUNTIME)
 @Target(FIELD)

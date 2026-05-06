@@ -1,5 +1,6 @@
 package io.github.tezch.atomsql.annotation;
 
+import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.TYPE;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
@@ -19,6 +20,6 @@ import io.github.tezch.atomsql.NonThreadSafeException;
  * @see AtomSql#tryNonThreadSafe(Supplier)
  * @author tezch
  */
-@Target(TYPE)
+@Target({ TYPE, FIELD })
 @Retention(RUNTIME)
 public @interface NonThreadSafe {}

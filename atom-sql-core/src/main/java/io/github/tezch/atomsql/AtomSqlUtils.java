@@ -3,6 +3,8 @@ package io.github.tezch.atomsql;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -49,7 +51,7 @@ public class AtomSqlUtils {
 
 	public static List<Class<?>> loadProxyClasses() throws IOException {
 		List<Class<?>> result = new LinkedList<>();
-		var enumeration = AtomSqlUtils.class.getClassLoader().getResources(Constants.PROXY_LIST);
+		var enumeration = AtomSqlUtils.class.getClassLoader().getResources(AtomSql.PROXY_LIST);
 		while (enumeration.hasMoreElements()) {
 			result.addAll(loadProxyClasses(enumeration.nextElement()));
 		}
@@ -67,6 +69,15 @@ public class AtomSqlUtils {
 			&& !AtomSqlUtils.isRestrictedKeyword(word);
 	}
 
+	public static int bindAsNull(int index, PreparedStatement statement, int sqlType) {
+		try {
+			statement.setNull(index, sqlType);
+			return index + 1;
+		} catch (SQLException e) {
+			throw new AtomSqlException(e);
+		}
+	}
+
 	private static boolean isRestrictedKeyword(String word) {
 		return RESTRICTED_KEYWORDS.contains(word);
 	}
@@ -75,7 +86,7 @@ public class AtomSqlUtils {
 		try (var proxyList = url.openStream()) {
 			if (proxyList == null) return Collections.emptyList();
 
-			return new String(AtomSqlUtils.readBytes(proxyList), Constants.CHARSET).lines().map(l -> {
+			return new String(AtomSqlUtils.readBytes(proxyList), AtomSql.CHARSET).lines().map(l -> {
 				try {
 					return Class.forName(l, false, Thread.currentThread().getContextClassLoader());
 				} catch (ClassNotFoundException e) {
@@ -86,7 +97,7 @@ public class AtomSqlUtils {
 		}
 	}
 
-	static String toStringForBindingValue(Object v) {
+	public static String toStringForBindingValue(Object v) {
 		if (v == null) {
 			return "null";
 		} else if (v instanceof Number) {
@@ -106,6 +117,6 @@ public class AtomSqlUtils {
 	}
 
 	static Optional<StackTraceElement[]> stackTrace() {
-		return AtomSql.configure().enableLog() ? Optional.of(new Throwable().getStackTrace()) : Optional.empty();
+		return AtomSql.configuration().enableLog() ? Optional.of(new Throwable().getStackTrace()) : Optional.empty();
 	}
 }

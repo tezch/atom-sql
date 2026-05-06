@@ -9,10 +9,9 @@ import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import io.github.tezch.atomsql.AtomSql;
-import io.github.tezch.atomsql.Configure;
-import io.github.tezch.atomsql.Constants;
-import io.github.tezch.atomsql.Endpoint;
-import io.github.tezch.atomsql.SimpleConfigure;
+import io.github.tezch.atomsql.Configuration;
+import io.github.tezch.atomsql.SimpleConfiguration;
+import io.github.tezch.atomsql.SqlService;
 import io.github.tezch.atomsql.annotation.SqlProxy;
 
 /**
@@ -23,36 +22,36 @@ import io.github.tezch.atomsql.annotation.SqlProxy;
  */
 public class AtomSqlContextInitializer implements ApplicationContextInitializer<GenericApplicationContext> {
 
-	private final Function<JdbcTemplate, Endpoint> endpointBuilder;
+	private final Function<JdbcTemplate, SqlService> sqlServiceBuilder;
 
 	/**
 	 * デフォルトコンストラクタです。
 	 */
 	public AtomSqlContextInitializer() {
-		endpointBuilder = jdbcTemplate -> new JdbcTemplateEndpoint(jdbcTemplate);
+		sqlServiceBuilder = jdbcTemplate -> new JdbcTemplateSqlService(jdbcTemplate);
 	}
 
 	/**
-	 * {@link JdbcTemplate}を利用する{@link Endpoint}を独自に生成するする際に使用するコンストラクタです。
-	 * @param endpointBuilder
+	 * {@link JdbcTemplate}を利用する{@link SqlService}を独自に生成するする際に使用するコンストラクタです。
+	 * @param sqlServiceBuilder
 	 */
-	public AtomSqlContextInitializer(@SuppressWarnings("exports") Function<JdbcTemplate, Endpoint> endpointBuilder) {
-		this.endpointBuilder = Objects.requireNonNull(endpointBuilder);
+	public AtomSqlContextInitializer(@SuppressWarnings("exports") Function<JdbcTemplate, SqlService> sqlServiceBuilder) {
+		this.sqlServiceBuilder = Objects.requireNonNull(sqlServiceBuilder);
 	}
 
 	@Override
 	public void initialize(@SuppressWarnings("exports") GenericApplicationContext context) {
 		var customizer = AtomSqlInitializer.beanDefinitionCustomizer();
 
-		AtomSql.initializeIfUninitialized(configure(context));
-		context.registerBean(AtomSql.class, () -> new AtomSql(AtomSqlInitializer.endpoints(context, endpointBuilder)), customizer);
+		AtomSql.initializeIfUninitialized(configuration(context));
+		context.registerBean(AtomSql.class, () -> new AtomSql(AtomSqlInitializer.sqlServices(context, sqlServiceBuilder)), customizer);
 
 		AtomSqlInitializer.registerAllSqlProxies(c -> {
 			context.registerBean(c, () -> context.getBean(AtomSql.class).of(c), customizer);
 		});
 	}
 
-	private static Configure configure(GenericApplicationContext context) {
+	private static Configuration configuration(GenericApplicationContext context) {
 		var environment = context.getEnvironment();
 		var enableLog = environment.getProperty(SpringConstants.PROPERTIES_PREFIX + ".enable-log", Boolean.class, false);
 
@@ -69,9 +68,9 @@ public class AtomSqlContextInitializer implements ApplicationContextInitializer<
 		var cacheCapacity = environment.getProperty(
 			SpringConstants.PROPERTIES_PREFIX + ".cache-capacity",
 			Integer.class,
-			Integer.parseInt(Constants.DEFAULT_CACHE_SIZE));
+			Integer.parseInt(AtomSql.DEFAULT_CACHE_SIZE));
 
-		return new SimpleConfigure(
+		return new SimpleConfiguration(
 			enableLog,
 			logStackTracePattern,
 			shouldIgnoreNoSqlLog,

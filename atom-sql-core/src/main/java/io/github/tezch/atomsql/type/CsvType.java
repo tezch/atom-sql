@@ -4,11 +4,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.function.Supplier;
-import java.util.stream.IntStream;
 
 import io.github.tezch.atomsql.AtomSqlType;
 import io.github.tezch.atomsql.AtomSqlTypeFactory;
 import io.github.tezch.atomsql.Csv;
+import io.github.tezch.atomsql.DefaultAtomSqlType;
 import io.github.tezch.atomsql.annotation.DataObject;
 
 /**
@@ -16,7 +16,9 @@ import io.github.tezch.atomsql.annotation.DataObject;
  * {@link DataObject}では使用できません。
  * @see Csv
  */
-public class CSV implements AtomSqlType {
+public class CsvType implements AtomSqlType {
+
+	private static final String TYPE_HINT = "CSV";
 
 	private final AtomSqlTypeFactory typeFactory;
 
@@ -24,7 +26,7 @@ public class CSV implements AtomSqlType {
 	 * コンストラクタ
 	 * @param typeFactory 値の型判定用
 	 */
-	public CSV(AtomSqlTypeFactory typeFactory) {
+	public CsvType(AtomSqlTypeFactory typeFactory) {
 		this.typeFactory = typeFactory;
 	}
 
@@ -34,22 +36,22 @@ public class CSV implements AtomSqlType {
 	}
 
 	@Override
-	public int bind(int index, PreparedStatement statement, Object value) {
+	public int bind(int index, PreparedStatement statement, Object value) throws SQLException {
 		var values = ((Csv<?>) value).values();
 
 		var size = values.size();
-		IntStream.range(0, size).forEach(i -> {
+		for (int i = 0; i < size; i++) {
 			var v = values.get(i);
 
 			AtomSqlType type;
 			if (v == null) {
-				type = NULL.instance;
+				type = DefaultAtomSqlType.NULL;
 			} else {
 				type = typeFactory.select(v.getClass());
 			}
 
 			type.bind(index + i, statement, v);
-		});
+		}
 
 		return index + size;
 	}
@@ -73,6 +75,11 @@ public class CSV implements AtomSqlType {
 	@Override
 	public AtomSqlType toTypeArgument() {
 		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public String typeHint() {
+		return TYPE_HINT;
 	}
 
 	private static final ThreadLocal<NonThreadSafeSource> nonThreadSafeSource = new ThreadLocal<>();
@@ -114,7 +121,7 @@ public class CSV implements AtomSqlType {
 		var type = factory.select(value.getClass());
 
 		//Csvの値としてCsvを使用することはできません
-		if (type instanceof CSV) throw new IllegalStateException("Cannot use Csv as Csv value");
+		if (type instanceof CsvType) throw new IllegalStateException("Cannot use Csv as Csv value");
 
 		return type.nonThreadSafe();
 	}

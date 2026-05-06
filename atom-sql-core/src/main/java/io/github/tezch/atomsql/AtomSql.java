@@ -12,6 +12,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -36,11 +38,11 @@ import io.github.tezch.atomsql.SqlComposite.Component;
 import io.github.tezch.atomsql.SqlComposite.Prototype;
 import io.github.tezch.atomsql.SqlComposite.SqlCompositeHelper;
 import io.github.tezch.atomsql.SqlComposite.Text;
-import io.github.tezch.atomsql.annotation.Confidential;
-import io.github.tezch.atomsql.annotation.ConfidentialSql;
+import io.github.tezch.atomsql.annotation.DataObject;
 import io.github.tezch.atomsql.annotation.NoSqlLog;
 import io.github.tezch.atomsql.annotation.NonThreadSafe;
 import io.github.tezch.atomsql.annotation.Qualifier;
+import io.github.tezch.atomsql.annotation.Sensitive;
 import io.github.tezch.atomsql.annotation.Sql;
 import io.github.tezch.atomsql.annotation.SqlFile;
 import io.github.tezch.atomsql.annotation.SqlProxy;
@@ -54,11 +56,41 @@ import io.github.tezch.atomsql.annotation.processor.Methods;
 public class AtomSql {
 
 	/**
+	 * {@link SqlProxy}メタ情報保持クラスの名称サフィックス
+	 */
+	public static final String METADATA_CLASS_SUFFIX = "$AtomSqlMetadata";
+
+	/**
+	 * {@link DataObject}メタ情報保持クラスの名称サフィックス
+	 */
+	public static final String DATA_OBJECT_METADATA_CLASS_SUFFIX = "$AtomSqlDataObjectMetadata";
+
+	/**
+	 * SQLファイル、その他Atom SQLで使用する入出力ファイルの文字コード
+	 */
+	public static final Charset CHARSET = StandardCharsets.UTF_8;
+
+	/**
+	 * 改行コード
+	 */
+	public static final String NEW_LINE = System.getProperty("line.separator");
+
+	/**
+	 * {@link SqlProxy}メタ情報保持クラスの一覧ファイル名
+	 */
+	public static final String PROXY_LIST = "io.github.tezch.atom-sql.proxy-list";
+
+	/**
+	 * {@link AtomSql}のキャッシュ最大値のデフォルト
+	 */
+	public static final String DEFAULT_CACHE_SIZE = "5000";
+
+	/**
 	 * AtomSqlにパラメーターの設定を適用して初期化します。
 	 * @param config 設定
 	 * @throws IllegalStateException 既に初期化済みの場合
 	 */
-	public static void initialize(Configure config) {
+	public static void initialize(Configuration config) {
 		AtomSqlInitializer.initialize(config);
 	}
 
@@ -75,7 +107,7 @@ public class AtomSql {
 	 * 既に初期化済みの場合このメソッドは何も行いません。
 	 * @param config 設定
 	 */
-	public static void initializeIfUninitialized(Configure config) {
+	public static void initializeIfUninitialized(Configuration config) {
 		AtomSqlInitializer.initializeIfUninitialized(config);
 	}
 
@@ -89,10 +121,10 @@ public class AtomSql {
 
 	/**
 	 * 現設定値
-	 * @return {@link Configure}
+	 * @return {@link Configuration}
 	 */
-	public static Configure configure() {
-		return AtomSqlInitializer.configure();
+	public static Configuration configuration() {
+		return AtomSqlInitializer.configuration();
 	}
 
 	static final Logger logger = System.getLogger(AtomSql.class.getName());
@@ -109,7 +141,7 @@ public class AtomSql {
 
 	private final ThreadLocal<List<Stream<?>>> streams = new ThreadLocal<>();
 
-	private final Endpoints endpoints;
+	private final SqlServices sqlServices;
 
 	final Optional<Pattern> logStacktracePattern;
 
@@ -127,7 +159,7 @@ public class AtomSql {
 		private int num = 0;
 
 		private BatchResources() {
-			var threshold = configure().batchThreshold();
+			var threshold = configuration().batchThreshold();
 			this.threshold = threshold > 0 ? threshold : Integer.MAX_VALUE;
 		}
 
@@ -159,7 +191,7 @@ public class AtomSql {
 		private void flush(String name, String sql, List<Resource> resources) {
 			var startNanos = System.nanoTime();
 			try {
-				var results = endpoints.get(name).endpoint().batchUpdate(sql, new BatchPreparedStatementSetter() {
+				var results = sqlServices.get(name).sqlService().batchUpdate(sql, new BatchPreparedStatementSetter() {
 
 					@Override
 					public void setValues(PreparedStatement ps, int i) throws SQLException {
@@ -194,16 +226,16 @@ public class AtomSql {
 
 	/**
 	 * 通常のコンストラクタです。<br>
-	 * {@link Endpoints}の持つ{@link Endpoint}の実装を切り替えることで、動作検証や自動テスト用に実行することが可能です。
-	 * @param endpoints {@link Endpoints}
+	 * {@link SqlServices}の持つ{@link SqlService}の実装を切り替えることで、動作検証や自動テスト用に実行することが可能です。
+	 * @param sqlServices {@link SqlServices}
 	 */
-	public AtomSql(Endpoints endpoints) {
+	public AtomSql(SqlServices sqlServices) {
 		typeFactory = AtomSqlTypeFactory.newInstance(
-			configure().typeFactoryClass(),
+			configuration().typeFactoryClass(),
 			Thread.currentThread().getContextClassLoader());
 		sqlLogger = SqlLogger.instance();
-		this.endpoints = Objects.requireNonNull(endpoints);
-		logStacktracePattern = logStacktracePattern(configure());
+		this.sqlServices = Objects.requireNonNull(sqlServices);
+		logStacktracePattern = logStacktracePattern(configuration());
 	}
 
 	/**
@@ -215,19 +247,19 @@ public class AtomSql {
 	public AtomSql(AtomSql base) {
 		typeFactory = base.typeFactory;
 		sqlLogger = base.sqlLogger;
-		this.endpoints = base.endpoints;
-		logStacktracePattern = logStacktracePattern(configure());
+		this.sqlServices = base.sqlServices;
+		logStacktracePattern = logStacktracePattern(configuration());
 	}
 
 	AtomSql() {
-		var configure = configure();
+		var config = configuration();
 
 		typeFactory = AtomSqlTypeFactory.newInstance(
-			configure.typeFactoryClass(),
+			config.typeFactoryClass(),
 			Thread.currentThread().getContextClassLoader());
 		sqlLogger = SqlLogger.instance();
 
-		endpoints = new Endpoints(new Endpoint() {
+		sqlServices = new SqlServices(new SqlService() {
 
 			@Override
 			public int[] batchUpdate(String sql, BatchPreparedStatementSetter bpss) {
@@ -259,7 +291,7 @@ public class AtomSql {
 			}
 
 			@Override
-			public void logConfidentialSql(
+			public void logSensitiveSql(
 				Logger logger,
 				String originalSql,
 				String sql,
@@ -269,17 +301,17 @@ public class AtomSql {
 			}
 
 			@Override
-			public void bollowConnection(Consumer<ConnectionProxy> consumer) {
+			public void borrowConnection(Consumer<ConnectionProxy> consumer) {
 				throw new UnsupportedOperationException();
 			}
 		});
 
-		logStacktracePattern = logStacktracePattern(configure);
+		logStacktracePattern = logStacktracePattern(config);
 	}
 
-	private static Optional<Pattern> logStacktracePattern(Configure configure) {
-		if (configure.enableLog()) {
-			return Optional.of(Pattern.compile(configure.logStacktracePattern()));
+	private static Optional<Pattern> logStacktracePattern(Configuration config) {
+		if (config.enableLog()) {
+			return Optional.of(Pattern.compile(config.logStacktracePattern()));
 		}
 
 		return Optional.empty();
@@ -290,7 +322,7 @@ public class AtomSql {
 	 * 対象自体に{@link Qualifier}が無くても、その他のアノテーション自体に{@link Qualifier}が付与されていればそれを返す
 	 */
 	private Optional<Qualifier> qualifier(AnnotatedElement e) {
-		if (!configure().usesQualifier()) return Optional.empty();
+		if (!configuration().usesQualifier()) return Optional.empty();
 
 		var qualifier = e.getAnnotation(Qualifier.class);
 		if (qualifier != null) return Optional.of(qualifier);
@@ -342,7 +374,7 @@ public class AtomSql {
 		}
 	}
 
-	private final int capacity = configure().cacheCapacity();
+	private final int capacity = configuration().cacheCapacity();
 
 	private final ConcurrentHashMap<Method, Helpers> cache = cache();
 
@@ -364,7 +396,7 @@ public class AtomSql {
 		var proxyName = proxyInterface.getName();
 
 		var methods = Class.forName(
-			proxyName + Constants.METADATA_CLASS_SUFFIX,
+			proxyName + METADATA_CLASS_SUFFIX,
 			true,
 			Thread.currentThread().getContextClassLoader()).getAnnotation(Methods.class);
 
@@ -459,16 +491,16 @@ public class AtomSql {
 		Optional<ParameterBinderInfo> parameterBinderInfo) {
 		var parameterNames = metadata.parameters();
 
-		var confidentialSql = method.getAnnotation(ConfidentialSql.class);
+		var sensitive = method.getAnnotation(Sensitive.class);
 
-		Supplier<String[]> confidentialSqlValueSupplier = () -> {
-			var confidentialSqlValue = confidentialSql.value();
+		Supplier<String[]> sensitiveValueSupplier = () -> {
+			var sensitiveValue = sensitive.value();
 
-			//ConfidentialSqlが付与されているが、valueが指定されていない場合、すべて機密扱い
-			return confidentialSqlValue.length == 0 ? parameterNames : confidentialSqlValue;
+			//Sensitiveが付与されているが、valueが指定されていない場合、すべて機密扱い
+			return sensitiveValue.length == 0 ? parameterNames : sensitiveValue;
 		};
 
-		var confidentials = new HashSet<>(Arrays.asList(confidentialSql == null ? emptyStringArray : confidentialSqlValueSupplier.get()));
+		var sensitives = new HashSet<>(Arrays.asList(sensitive == null ? emptyStringArray : sensitiveValueSupplier.get()));
 
 		var parameterAnnotations = method.getParameterAnnotations();
 
@@ -479,13 +511,22 @@ public class AtomSql {
 			var annotations = parameterAnnotations[i];
 
 			Arrays.stream(annotations)
-				.filter(a -> a instanceof Confidential)
+				.filter(a -> a instanceof Sensitive)
 				.findFirst()
+				.map(a -> (Sensitive) a)
 				.ifPresent(a -> {
 					if (parameterBinderInfo.isPresent()) {
-						Arrays.stream(parameterBinderClass.getFields()).map(f -> f.getName()).forEach(confidentials::add);
+						var values = a.value();
+
+						var fields = Arrays.stream(parameterBinderClass.getFields()).map(Field::getName);
+						if (values.length != 0) {
+							var valuesSet = Set.of(values);
+							fields = fields.filter(f -> valuesSet.contains(f));
+						}
+
+						fields.forEach(sensitives::add);
 					} else {
-						confidentials.add(name);
+						sensitives.add(name);
 					}
 				});
 		}
@@ -497,7 +538,7 @@ public class AtomSql {
 			throw new UncheckedIOException(e);
 		}
 
-		var conf = configure();
+		var conf = configuration();
 
 		SqlLogger mySqlLogger;
 		if (conf.enableLog()) {
@@ -579,7 +620,7 @@ public class AtomSql {
 
 			sqlCompositeHelper = sqlCompositeHelper(
 				sql,
-				confidentials,
+				sensitives,
 				fieldNames,
 				types.toArray(AtomSqlType[]::new),
 				metadata.nonThreadSafe());
@@ -588,7 +629,7 @@ public class AtomSql {
 
 			sqlCompositeHelper = sqlCompositeHelper(
 				sql,
-				confidentials,
+				sensitives,
 				parameterNames,
 				types,
 				metadata.nonThreadSafe());
@@ -598,7 +639,7 @@ public class AtomSql {
 		var nameAnnotation = qualifier(method).or(() -> qualifier(proxyInterface));
 
 		SqlProxyHelper sqlProxyHelper = new SqlProxyHelper(
-			nameAnnotation.map(a -> endpoints.get(a.value())).orElseGet(() -> endpoints.get()),
+			nameAnnotation.map(a -> sqlServices.get(a.value())).orElseGet(() -> sqlServices.get()),
 			metadata.result(),
 			typeFactory,
 			mySqlLogger,
@@ -626,7 +667,7 @@ public class AtomSql {
 
 	private static SqlCompositeHelper sqlCompositeHelper(
 		SecureString secureSql,
-		Set<String> confidentials,
+		Set<String> sensitives,
 		String[] parameterNames,
 		AtomSqlType[] parameterTypes,
 		boolean containsNonThreadSafeValue) {
@@ -652,7 +693,7 @@ public class AtomSql {
 			components.add(
 				new Prototype(
 					f.placeholder,
-					confidentials.contains(f.placeholder),
+					sensitives.contains(f.placeholder),
 					f.all,
 					map.get(f.placeholder)));
 		});
@@ -836,7 +877,7 @@ public class AtomSql {
 	/**
 	 * {@link ConnectionProxy}を使用して行う処理を実施します。<br>
 	 * 実装によっては、処理終了時に内部で使用する{@link Connection}がクローズされる可能性があります。<br>
-	 * デフォルトであるプライマリ{@link Endpoint}が使用されます。<br>
+	 * デフォルトであるプライマリ{@link SqlService}が使用されます。<br>
 	 * 処理内では、スレッドセーフではない値を使用することが可能です。
 	 * @param consumer
 	 */
@@ -847,13 +888,13 @@ public class AtomSql {
 	/**
 	 * {@link ConnectionProxy}を使用して行う処理を実施します。<br>
 	 * 実装によっては、処理終了時に内部で使用する{@link Connection}がクローズされる可能性があります。<br>
-	 * qualifierによって使用する{@link Endpoint}を選択可能です。<br>
+	 * qualifierによって使用する{@link SqlService}を選択可能です。<br>
 	 * 処理内では、スレッドセーフではない値を使用することが可能です。
 	 * @param qualifier {@link Qualifier}に使用する値
 	 * @param consumer
 	 */
 	public void bollowConnection(String qualifier, Consumer<ConnectionProxy> consumer) {
-		tryNonThreadSafe(() -> endpoints.get(qualifier).endpoint().bollowConnection(consumer));
+		tryNonThreadSafe(() -> sqlServices.get(qualifier).sqlService().borrowConnection(consumer));
 	}
 
 	private static final String[] emptyStringArray = {};
@@ -864,7 +905,7 @@ public class AtomSql {
 
 	SqlProxyHelper helper() {
 		return new SqlProxyHelper(
-			endpoints.get(),
+			sqlServices.get(),
 			Object.class,
 			typeFactory,
 			sqlLogger,
@@ -910,7 +951,7 @@ public class AtomSql {
 	}
 
 	static record SqlProxyHelper(
-		Endpoints.Entry entry,
+		SqlServices.Entry entry,
 		Class<?> resultClass,
 		AtomSqlTypeFactory typeFactory,
 		SqlLogger sqlLogger,
@@ -953,6 +994,6 @@ public class AtomSql {
 			//sqlFileNameが見つかりませんでした
 			throw new IllegalStateException(sqlFileName + " was not found");
 
-		return new SecureString(new String(AtomSqlUtils.readBytes(url.openStream()), Constants.CHARSET));
+		return new SecureString(new String(AtomSqlUtils.readBytes(url.openStream()), CHARSET));
 	}
 }

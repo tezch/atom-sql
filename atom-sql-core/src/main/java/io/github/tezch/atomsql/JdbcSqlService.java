@@ -17,10 +17,10 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 /**
- * JDBCを使用した{@link Endpoint}の簡易実装クラスです。
+ * JDBCを使用した{@link SqlService}の簡易実装クラスです。
  * @author tezch
  */
-public class JdbcEndpoint implements Endpoint {
+public class JdbcSqlService implements SqlService {
 
 	private final Supplier<Connection> supplier;
 
@@ -30,14 +30,14 @@ public class JdbcEndpoint implements Endpoint {
 	 * 単一のコンストラクタです。
 	 * @param supplier {@link Connection}の供給元
 	 */
-	public JdbcEndpoint(Supplier<Connection> supplier) {
+	public JdbcSqlService(Supplier<Connection> supplier) {
 		this.supplier = Objects.requireNonNull(supplier);
 	}
 
 	@Override
 	public int[] batchUpdate(String sql, BatchPreparedStatementSetter bpss) {
 		try (var conn = connection()) {
-			try (var ps = conn.prepareStatement(Constants.NEW_LINE + sql)) {
+			try (var ps = conn.prepareStatement(AtomSql.NEW_LINE + sql)) {
 				var size = bpss.getBatchSize();
 				for (var i = 0; i < size; i++) {
 					bpss.setValues(ps, i);
@@ -57,15 +57,15 @@ public class JdbcEndpoint implements Endpoint {
 		PreparedStatementSetter pss,
 		RowMapper<T> rowMapper,
 		SqlProxySnapshot snapshot) {
+		Connection conn = connection();
+		PreparedStatement ps = null;
+		ResultSet rs = null;
 		try {
-			var conn = connection();
-
-			var ps = conn.prepareStatement(Constants.NEW_LINE + sql);
-			ps.closeOnCompletion();
+			ps = conn.prepareStatement(AtomSql.NEW_LINE + sql);
 
 			pss.setValues(ps);
 
-			var rs = ps.executeQuery();
+			rs = ps.executeQuery();
 
 			var stream = StreamSupport.stream(
 				Spliterators.spliteratorUnknownSize(
@@ -74,30 +74,44 @@ public class JdbcEndpoint implements Endpoint {
 					Spliterator.NONNULL | Spliterator.IMMUTABLE),
 				false);
 
+			var fps = ps;
+			var frs = rs;
 			stream.onClose(() -> {
 				try {
-					rs.close();
+					close(frs, fps, conn);
 				} catch (SQLException e) {
 					throw new AtomSqlException(e);
-				} finally {
-					try {
-						conn.close();
-					} catch (SQLException e) {
-						throw new AtomSqlException(e);
-					}
 				}
 			});
 
 			return stream;
 		} catch (SQLException e) {
+			try {
+				close(rs, ps, conn);
+			} catch (SQLException ex) {
+				e.addSuppressed(ex);
+			}
+
 			throw new AtomSqlException(e);
+		} catch (Exception e) {
+			try {
+				close(rs, ps, conn);
+			} catch (SQLException ex) {
+				e.addSuppressed(ex);
+			}
+
+			throw new IllegalStateException(e);
 		}
+	}
+
+	private static void close(ResultSet rs, PreparedStatement ps, Connection conn) throws SQLException {
+		try (rs; ps; conn) {}
 	}
 
 	@Override
 	public int update(String sql, PreparedStatementSetter pss, SqlProxySnapshot snapshot) {
 		try (var conn = connection()) {
-			try (var ps = conn.prepareStatement(Constants.NEW_LINE + sql)) {
+			try (var ps = conn.prepareStatement(AtomSql.NEW_LINE + sql)) {
 				pss.setValues(ps);
 
 				return ps.executeUpdate();
@@ -114,24 +128,24 @@ public class JdbcEndpoint implements Endpoint {
 		String sql,
 		PreparedStatement ps,
 		SqlProxySnapshot snapshot) {
-		logger.log(Level.INFO, "sql:" + Constants.NEW_LINE + ps.toString());
+		logger.log(Level.INFO, "sql:" + AtomSql.NEW_LINE + ps.toString());
 	}
 
 	@Override
-	public void logConfidentialSql(
+	public void logSensitiveSql(
 		Logger logger,
 		String originalSql,
 		String sql,
 		List<BindingValue> bindingValues,
 		SqlProxySnapshot snapshot) {
-		logger.log(Level.INFO, "confidential sql:" + Constants.NEW_LINE + originalSql);
+		logger.log(Level.INFO, "sensitive sql:" + AtomSql.NEW_LINE + originalSql);
 		logger.log(Level.INFO, "binding values:");
 
 		bindingValues.forEach(p -> logger.log(Level.INFO, p.name() + ": " + p.value()));
 	}
 
 	@Override
-	public void bollowConnection(Consumer<ConnectionProxy> consumer) {
+	public void borrowConnection(Consumer<ConnectionProxy> consumer) {
 		try (var conn = supplier.get()) {
 			connection.set(conn);
 
@@ -144,7 +158,7 @@ public class JdbcEndpoint implements Endpoint {
 	}
 
 	/**
-	 * bollowConnection中は同一のConnectionの使用を強制する
+	 * borrowConnection中は同一のConnectionの使用を強制する
 	 */
 	private Connection connection() {
 		var con = connection.get();

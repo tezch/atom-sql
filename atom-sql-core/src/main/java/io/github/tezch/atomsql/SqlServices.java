@@ -6,20 +6,20 @@ import java.util.Map;
 import io.github.tezch.atomsql.annotation.Qualifier;
 
 /**
- * {@link Endpoint}を複数管理するためのマップクラスです。
+ * {@link SqlService}を複数管理するためのマップクラスです。
  * @author tezch
  */
-public class Endpoints {
+public class SqlServices {
 
 	private final Entry primary;
 
 	private final Map<String, Entry> map;
 
 	/**
-	 * 複数の{@link Endpoint}を設定してインスタンスを生成します。
+	 * 複数の{@link SqlService}を設定してインスタンスを生成します。
 	 * @param entries
 	 */
-	public Endpoints(Entry... entries) {
+	public SqlServices(Entry... entries) {
 		if (entries.length == 0) throw new IllegalArgumentException("Empty entries");
 
 		map = new LinkedHashMap<>();
@@ -39,16 +39,16 @@ public class Endpoints {
 	}
 
 	/**
-	 * 単体の{@link Endpoint}を設定してインスタンスを生成します。
-	 * @param primaryEndpoint
+	 * 単体の{@link SqlService}を設定してインスタンスを生成します。
+	 * @param primarySqlService
 	 */
-	public Endpoints(Endpoint primaryEndpoint) {
-		this(new Entry(null, primaryEndpoint, true));
+	public SqlServices(SqlService primarySqlService) {
+		this(new Entry(null, primarySqlService, true));
 	}
 
 	/**
 	 * {@link Qualifier}の値をもとに対応する{@link Entry}を返します。
-	 * @param name Bean名 nullの場合プライマリ{@link Endpoint}が返却される
+	 * @param name Bean名 nullの場合プライマリ{@link SqlService}が返却される
 	 * @return {@link Entry}
 	 */
 	public Entry get(String name) {
@@ -56,7 +56,7 @@ public class Endpoints {
 	}
 
 	/**
-	 * プライマリ{@link Endpoint}を返します。
+	 * プライマリ{@link SqlService}を返します。
 	 * @return {@link Entry}
 	 */
 	public Entry get() {
@@ -64,10 +64,10 @@ public class Endpoints {
 	}
 
 	/**
-	 * {@link Endpoints}用要素
+	 * {@link SqlServices}用要素
 	 * @param name {@link Qualifier}名
-	 * @param endpoint {@link Endpoint}
+	 * @param sqlService {@link SqlService}
 	 * @param primary プライマリBeanかどうか
 	 */
-	public static record Entry(String name, Endpoint endpoint, boolean primary) {}
+	public static record Entry(String name, SqlService sqlService, boolean primary) {}
 }

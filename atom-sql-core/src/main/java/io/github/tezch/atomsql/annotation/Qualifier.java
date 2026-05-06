@@ -7,10 +7,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import io.github.tezch.atomsql.Endpoint;
+import io.github.tezch.atomsql.SqlService;
 
 /**
- * {@link Endpoint}を登録する対象となる識別子を表します。
+ * {@link SqlService}を登録する対象となる識別子を表します。
  * @author tezch
  */
 @Target({ TYPE, METHOD })

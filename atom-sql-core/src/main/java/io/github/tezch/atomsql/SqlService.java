@@ -10,7 +10,7 @@ import java.util.stream.Stream;
  * Atom SQLで使用する機能のみを操作可能にするためのインターフェイスです。
  * @author tezch
  */
-public interface Endpoint {
+public interface SqlService {
 
 	/**
 	 * バッチ更新を実行します。
@@ -42,7 +42,7 @@ public interface Endpoint {
 
 	/**
 	 * SQLログ出力を行う設定にしている場合、実装に合わせたSQL文をログ出力します。
-	 * @see Configure#enableLog
+	 * @see Configuration#enableLog
 	 * @param logger {@link Logger}
 	 * @param originalSql プレースホルダ変換前のSQL
 	 * @param sql プレースホルダ変換後のSQL
@@ -58,14 +58,14 @@ public interface Endpoint {
 
 	/**
 	 * SQLログ出力を行う設定にしている場合、実装に合わせたSQL文をログ出力します。
-	 * @see Configure#enableLog
+	 * @see Configuration#enableLog
 	 * @param logger {@link Logger}
 	 * @param originalSql プレースホルダ変換前のSQL
 	 * @param sql プレースホルダ変換後のSQL
 	 * @param bindingValues セットされた値の文字列表現
 	 * @param snapshot {@link SqlProxySnapshot}
 	 */
-	void logConfidentialSql(
+	void logSensitiveSql(
 		Logger logger,
 		String originalSql,
 		String sql,
@@ -76,7 +76,7 @@ public interface Endpoint {
 	 * {@link ConnectionProxy}を使用して行う処理を実施します。
 	 * @param consumer
 	 */
-	void bollowConnection(Consumer<ConnectionProxy> consumer);
+	void borrowConnection(Consumer<ConnectionProxy> consumer);
 
 	/**
 	 * BindingValue

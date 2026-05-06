@@ -12,10 +12,10 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 
-import io.github.tezch.atomsql.Constants;
+import io.github.tezch.atomsql.AtomSql;
+import io.github.tezch.atomsql.DefaultAtomSqlType;
 import io.github.tezch.atomsql.PlaceholderFinder;
 import io.github.tezch.atomsql.SqlMasker;
-import io.github.tezch.atomsql.type.OBJECT;
 
 class ParameterBinderBuilder extends HelperBuilder {
 
@@ -84,12 +84,12 @@ class ParameterBinderBuilder extends HelperBuilder {
 
 			var typeFactory = ProcessorTypeFactory.instance;
 
-			var type = f.typeHint.map(typeFactory::typeOf).orElse(OBJECT.instance);
+			var type = f.typeHint.map(typeFactory::typeOf).orElse(DefaultAtomSqlType.OBJECT);
 
 			var argumentType = f.typeArgumentHint.map(typeFactory::typeArgumentOf);
 			// 型パラメータが必要なのにヒントがない場合
 			if (type.needsTypeArgument() && argumentType.isEmpty()) {
-				argumentType = Optional.of(OBJECT.instance);
+				argumentType = Optional.of(DefaultAtomSqlType.OBJECT);
 			}
 
 			var typeArgument = argumentType
@@ -117,9 +117,9 @@ class ParameterBinderBuilder extends HelperBuilder {
 
 		this.nonThreadSafe.set(nonThreadSafe[0]);
 
-		param.put("FIELDS", String.join(Constants.NEW_LINE, fields));
+		param.put("FIELDS", String.join(AtomSql.NEW_LINE, fields));
 
-		param.put("ENUM_VALIDATORS", String.join(Constants.NEW_LINE, enumValidators));
+		param.put("ENUM_VALIDATORS", String.join(AtomSql.NEW_LINE, enumValidators));
 	}
 
 	private ThreadLocal<Boolean> nonThreadSafe = ThreadLocal.withInitial(() -> false);
