@@ -1,10 +1,13 @@
-package io.github.tezch.atomsql;
+package io.github.tezch.atomsql.internal;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Optional;
 import java.util.Properties;
 
+import io.github.tezch.atomsql.AtomSql;
+import io.github.tezch.atomsql.AtomSqlTypeFactory;
+import io.github.tezch.atomsql.Configuration;
 import io.github.tezch.atomsql.annotation.NoSqlLog;
 import io.github.tezch.atomsql.annotation.Qualifier;
 

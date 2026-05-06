@@ -4,6 +4,8 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Optional;
 
+import io.github.tezch.atomsql.internal.AtomSqlUtils;
+
 /**
  * org.springframework.jdbc.core.BatchPreparedStatementSetter
  * @author tezch

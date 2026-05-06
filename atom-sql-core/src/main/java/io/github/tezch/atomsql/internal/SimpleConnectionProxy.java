@@ -1,9 +1,12 @@
-package io.github.tezch.atomsql;
+package io.github.tezch.atomsql.internal;
 
 import java.sql.Blob;
 import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.SQLException;
+
+import io.github.tezch.atomsql.AtomSqlException;
+import io.github.tezch.atomsql.ConnectionProxy;
 
 /**
  * {@link ConnectionProxy}の簡易実装クラスです。

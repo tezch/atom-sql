@@ -8,7 +8,7 @@ import io.github.tezch.atomsql.AtomSqlTypeFactory;
 import io.github.tezch.atomsql.Configuration;
 import io.github.tezch.atomsql.annotation.NoSqlLog;
 import io.github.tezch.atomsql.annotation.Qualifier;
-import io.github.tezch.atomsql.spring.SpringConstants;
+import io.github.tezch.atomsql.spring.AtomSqlContextInitializer;
 
 /**
  * AtomSqlProperties
@@ -22,7 +22,7 @@ import io.github.tezch.atomsql.spring.SpringConstants;
  * @param batchThreshold バッチ更新時の閾値
  * @param cacheCapacity キャッシュの最大値
  */
-@ConfigurationProperties(prefix = SpringConstants.PROPERTIES_PREFIX)
+@ConfigurationProperties(prefix = AtomSqlContextInitializer.PROPERTIES_PREFIX)
 public record AtomSqlProperties(
 	@DefaultValue("false") boolean enableLog,
 	@DefaultValue(".+") String logStacktracePattern,

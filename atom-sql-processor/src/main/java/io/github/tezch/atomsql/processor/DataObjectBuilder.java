@@ -14,11 +14,11 @@ import javax.lang.model.element.ExecutableElement;
 
 import io.github.tezch.atomsql.Atom;
 import io.github.tezch.atomsql.AtomSql;
-import io.github.tezch.atomsql.ColumnFinder;
 import io.github.tezch.atomsql.DefaultAtomSqlType;
 import io.github.tezch.atomsql.Protoatom;
-import io.github.tezch.atomsql.SqlMasker;
 import io.github.tezch.atomsql.annotation.DataObject;
+import io.github.tezch.atomsql.internal.ColumnFinder;
+import io.github.tezch.atomsql.internal.SqlMasker;
 import io.github.tezch.atomsql.processor.MethodExtractor.Result;
 
 /**

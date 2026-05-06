@@ -1,5 +1,7 @@
 package io.github.tezch.atomsql;
 
+import io.github.tezch.atomsql.internal.PropertiesConfiguration;
+
 /**
  * 内部使用クラス
  */
@@ -42,16 +44,15 @@ public class AtomSqlInitializer {
 		initialize(new PropertiesConfiguration());
 	}
 
+	/**
+	 * @return {@link Configuration}
+	 */
+	public static Configuration configuration() {
+		return configHolder.get();
+	}
+
 	private synchronized static Configuration configurationInternal() {
 		if (staticConfig == null) throw new IllegalStateException("Atom SQL is not initialized");
 		return staticConfig;
-	}
-
-	/**
-	 * 
-	 * @return {@link Configuration}
-	 */
-	static Configuration configuration() {
-		return configHolder.get();
 	}
 }

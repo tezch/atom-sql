@@ -19,8 +19,8 @@ import javax.tools.Diagnostic.Kind;
 import javax.tools.StandardLocation;
 
 import io.github.tezch.atomsql.AtomSql;
-import io.github.tezch.atomsql.AtomSqlUtils;
 import io.github.tezch.atomsql.annotation.SqlProxy;
+import io.github.tezch.atomsql.internal.AtomSqlUtils;
 import io.github.tezch.atomsql.processor.MethodExtractor.Result;
 import io.github.tezch.atomsql.processor.MethodExtractor.SqlNotFoundException;
 import io.github.tezch.atomsql.processor.SqlFileResolver.SqlFileNotFoundException;

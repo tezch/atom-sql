@@ -1,4 +1,4 @@
-package io.github.tezch.atomsql;
+package io.github.tezch.atomsql.internal;
 
 import java.util.LinkedList;
 import java.util.List;

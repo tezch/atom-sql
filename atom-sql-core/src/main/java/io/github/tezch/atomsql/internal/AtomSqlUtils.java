@@ -1,4 +1,4 @@
-package io.github.tezch.atomsql;
+package io.github.tezch.atomsql.internal;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,6 +13,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.lang.model.SourceVersion;
+
+import io.github.tezch.atomsql.AtomSql;
+import io.github.tezch.atomsql.AtomSqlException;
 
 /**
  * 内部使用ユーティリティクラスです。
@@ -109,14 +112,14 @@ public class AtomSqlUtils {
 		return "[" + v.toString() + "]";
 	}
 
+	public static Optional<StackTraceElement[]> stackTrace() {
+		return AtomSql.configuration().enableLog() ? Optional.of(new Throwable().getStackTrace()) : Optional.empty();
+	}
+
 	private static byte[] concatByteArray(byte[] array1, int lengthof1, byte[] array2, int lengthof2) {
 		var concat = new byte[lengthof1 + lengthof2];
 		System.arraycopy(array1, 0, concat, 0, lengthof1);
 		System.arraycopy(array2, 0, concat, lengthof1, lengthof2);
 		return concat;
-	}
-
-	static Optional<StackTraceElement[]> stackTrace() {
-		return AtomSql.configuration().enableLog() ? Optional.of(new Throwable().getStackTrace()) : Optional.empty();
 	}
 }

@@ -10,10 +10,10 @@ import org.springframework.beans.factory.config.BeanDefinitionCustomizer;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import io.github.tezch.atomsql.AtomSqlUtils;
 import io.github.tezch.atomsql.SqlService;
 import io.github.tezch.atomsql.SqlServices;
 import io.github.tezch.atomsql.annotation.SqlProxy;
+import io.github.tezch.atomsql.internal.AtomSqlUtils;
 
 /**
  * Spring FrameworkとSpring Bootでの設定処理の共通ロジック。

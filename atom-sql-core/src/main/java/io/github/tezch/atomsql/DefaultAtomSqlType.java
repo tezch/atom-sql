@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 import io.github.tezch.atomsql.annotation.NonThreadSafe;
+import io.github.tezch.atomsql.internal.AtomSqlUtils;
 
 public enum DefaultAtomSqlType implements AtomSqlType {
 

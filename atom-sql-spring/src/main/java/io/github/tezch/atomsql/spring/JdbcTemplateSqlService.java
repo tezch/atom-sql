@@ -16,9 +16,9 @@ import io.github.tezch.atomsql.AtomSql;
 import io.github.tezch.atomsql.BatchPreparedStatementSetter;
 import io.github.tezch.atomsql.ConnectionProxy;
 import io.github.tezch.atomsql.SqlService;
+import io.github.tezch.atomsql.internal.SimpleConnectionProxy;
 import io.github.tezch.atomsql.PreparedStatementSetter;
 import io.github.tezch.atomsql.RowMapper;
-import io.github.tezch.atomsql.SimpleConnectionProxy;
 import io.github.tezch.atomsql.SqlProxySnapshot;
 
 /**

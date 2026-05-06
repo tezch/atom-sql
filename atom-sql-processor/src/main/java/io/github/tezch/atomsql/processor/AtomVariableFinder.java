@@ -4,7 +4,7 @@ import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 import io.github.tezch.atomsql.Atom;
-import io.github.tezch.atomsql.AtomSqlUtils;
+import io.github.tezch.atomsql.internal.AtomSqlUtils;
 
 /**
  * 内部使用クラスです。<br>

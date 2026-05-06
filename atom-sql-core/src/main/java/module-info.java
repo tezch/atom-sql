@@ -16,5 +16,7 @@ module io.github.tezch.atomsql.core {
 
 	exports io.github.tezch.atomsql.type;
 
-	exports io.github.tezch.atomsql.test;
+	exports io.github.tezch.atomsql.internal to
+		io.github.tezch.atomsql.processor,
+		io.github.tezch.atomsql.spring;
 }

@@ -14,8 +14,8 @@ import javax.lang.model.element.VariableElement;
 
 import io.github.tezch.atomsql.AtomSql;
 import io.github.tezch.atomsql.DefaultAtomSqlType;
-import io.github.tezch.atomsql.PlaceholderFinder;
-import io.github.tezch.atomsql.SqlMasker;
+import io.github.tezch.atomsql.internal.PlaceholderFinder;
+import io.github.tezch.atomsql.internal.SqlMasker;
 
 class ParameterBinderBuilder extends HelperBuilder {
 

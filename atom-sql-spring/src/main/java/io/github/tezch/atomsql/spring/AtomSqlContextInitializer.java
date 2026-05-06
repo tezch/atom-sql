@@ -22,6 +22,11 @@ import io.github.tezch.atomsql.annotation.SqlProxy;
  */
 public class AtomSqlContextInitializer implements ApplicationContextInitializer<GenericApplicationContext> {
 
+	/**
+	 * Springのプロパティに記載するAtom SQL関連プロパティのプレフィクス
+	 */
+	public static final String PROPERTIES_PREFIX = "atomsql";
+
 	private final Function<JdbcTemplate, SqlService> sqlServiceBuilder;
 
 	/**
@@ -53,20 +58,20 @@ public class AtomSqlContextInitializer implements ApplicationContextInitializer<
 
 	private static Configuration configuration(GenericApplicationContext context) {
 		var environment = context.getEnvironment();
-		var enableLog = environment.getProperty(SpringConstants.PROPERTIES_PREFIX + ".enable-log", Boolean.class, false);
+		var enableLog = environment.getProperty(PROPERTIES_PREFIX + ".enable-log", Boolean.class, false);
 
-		var logStackTracePattern = environment.getProperty(SpringConstants.PROPERTIES_PREFIX + ".log-stacktrace-pattern", ".+");
+		var logStackTracePattern = environment.getProperty(PROPERTIES_PREFIX + ".log-stacktrace-pattern", ".+");
 
-		var shouldIgnoreNoSqlLog = environment.getProperty(SpringConstants.PROPERTIES_PREFIX + ".should-ignore-no-sql-log", Boolean.class, false);
+		var shouldIgnoreNoSqlLog = environment.getProperty(PROPERTIES_PREFIX + ".should-ignore-no-sql-log", Boolean.class, false);
 
-		var usesQualifier = environment.getProperty(SpringConstants.PROPERTIES_PREFIX + ".uses-qualifier", Boolean.class, false);
+		var usesQualifier = environment.getProperty(PROPERTIES_PREFIX + ".uses-qualifier", Boolean.class, false);
 
-		var typeFactoryClass = environment.getProperty(SpringConstants.PROPERTIES_PREFIX + ".type-factory-class", "");
+		var typeFactoryClass = environment.getProperty(PROPERTIES_PREFIX + ".type-factory-class", "");
 
-		var batchThreshold = environment.getProperty(SpringConstants.PROPERTIES_PREFIX + ".batch-threshold", Integer.class, 0);
+		var batchThreshold = environment.getProperty(PROPERTIES_PREFIX + ".batch-threshold", Integer.class, 0);
 
 		var cacheCapacity = environment.getProperty(
-			SpringConstants.PROPERTIES_PREFIX + ".cache-capacity",
+			PROPERTIES_PREFIX + ".cache-capacity",
 			Integer.class,
 			Integer.parseInt(AtomSql.DEFAULT_CACHE_SIZE));
 

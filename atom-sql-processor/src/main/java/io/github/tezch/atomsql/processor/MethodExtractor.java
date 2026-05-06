@@ -11,9 +11,9 @@ import javax.lang.model.element.Element;
 import javax.tools.Diagnostic.Kind;
 
 import io.github.tezch.atomsql.AtomSql;
-import io.github.tezch.atomsql.AtomSqlUtils;
 import io.github.tezch.atomsql.annotation.Sql;
 import io.github.tezch.atomsql.annotation.SqlFile;
+import io.github.tezch.atomsql.internal.AtomSqlUtils;
 import io.github.tezch.atomsql.processor.SqlFileResolver.SqlFileNotFoundException;
 
 class MethodExtractor {

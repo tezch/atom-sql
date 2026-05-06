@@ -32,6 +32,7 @@ import io.github.tezch.atomsql.annotation.SqlProxy;
 import io.github.tezch.atomsql.annotation.processor.Methods;
 import io.github.tezch.atomsql.annotation.processor.OptionalDatas;
 import io.github.tezch.atomsql.annotation.processor.TooManyColumnsDataObject;
+import io.github.tezch.atomsql.internal.AtomSqlUtils;
 
 /**
  * {@link SqlProxy}が生成する中間形態オブジェクトを表すクラスです。<br>

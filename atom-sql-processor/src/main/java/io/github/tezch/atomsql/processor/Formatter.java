@@ -5,7 +5,7 @@ import java.io.UncheckedIOException;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import io.github.tezch.atomsql.AtomSqlUtils;
+import io.github.tezch.atomsql.internal.AtomSqlUtils;
 
 /**
  * @author tezch

@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
+import io.github.tezch.atomsql.internal.SqlMasker;
 import io.github.tezch.atomsql.type.CsvType;
 
 class SqlComposite {

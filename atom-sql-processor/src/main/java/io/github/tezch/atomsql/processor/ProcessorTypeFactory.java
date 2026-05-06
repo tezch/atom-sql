@@ -9,7 +9,7 @@ import java.util.Objects;
 import io.github.tezch.atomsql.AtomSql;
 import io.github.tezch.atomsql.AtomSqlType;
 import io.github.tezch.atomsql.AtomSqlTypeFactory;
-import io.github.tezch.atomsql.AtomSqlUtils;
+import io.github.tezch.atomsql.internal.AtomSqlUtils;
 
 /**
  * @author tezch

@@ -10,9 +10,9 @@ import java.util.Objects;
 
 import io.github.tezch.atomsql.AtomSqlException;
 import io.github.tezch.atomsql.AtomSqlType;
-import io.github.tezch.atomsql.AtomSqlUtils;
 import io.github.tezch.atomsql.EnumNotFoundException;
 import io.github.tezch.atomsql.annotation.EnumValue;
+import io.github.tezch.atomsql.internal.AtomSqlUtils;
 
 /**
  * {@link Enum}

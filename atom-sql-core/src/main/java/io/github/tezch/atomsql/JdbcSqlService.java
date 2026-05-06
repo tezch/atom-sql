@@ -16,6 +16,8 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import io.github.tezch.atomsql.internal.SimpleConnectionProxy;
+
 /**
  * JDBCを使用した{@link SqlService}の簡易実装クラスです。
  * @author tezch

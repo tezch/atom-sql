@@ -1,4 +1,4 @@
-package io.github.tezch.atomsql;
+package io.github.tezch.atomsql.internal;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -6,6 +6,8 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import io.github.tezch.atomsql.AtomSql;
 
 /**
  * SQL解析の邪魔になるリテラルやコメントを隠し、復元します。
@@ -67,8 +69,10 @@ public class SqlMasker {
 
 	/**
 	 * このインスタンスでマスクしたSQLを元に戻します。
+	 * @param maskedSql masked
+	 * @return unmasked
 	 */
-	String unmask(String maskedSql) {
+	public String unmask(String maskedSql) {
 		Objects.requireNonNull(maskedSql);
 
 		var unmasked = new StringBuilder();
